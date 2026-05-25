@@ -49,8 +49,8 @@ export function Banner({ version, driver, model }: BannerProps): React.ReactElem
           preserved.
         </Text>
         <Text>
-          4. <Text color={COLORS.info}>/help</Text> lists every command, <Text color={COLORS.info}>/strategies</Text>
-          lists the {''}strategies.
+          4. <Text color={COLORS.info}>/help</Text> lists every command;{' '}
+          <Text color={COLORS.info}>/strategies</Text> lists the strategies.
         </Text>
       </Box>
     </Box>
