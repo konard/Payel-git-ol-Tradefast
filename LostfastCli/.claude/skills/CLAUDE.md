@@ -1,0 +1,1 @@
+# Note: This folder contains so-called skills that describe in detail how and what to do

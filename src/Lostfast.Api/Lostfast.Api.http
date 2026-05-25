@@ -1,0 +1,6 @@
+@Lostfast.Api_HostAddress = http://localhost:5066
+
+GET {{Lostfast.Api_HostAddress}}/weatherforecast/
+Accept: application/json
+
+###

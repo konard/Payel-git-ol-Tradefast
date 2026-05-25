@@ -1,0 +1,7 @@
+﻿services:
+  lostfastcli:
+    image: lostfastcli
+    build:
+      context: .
+      dockerfile: LostfastCli/Dockerfile
+
