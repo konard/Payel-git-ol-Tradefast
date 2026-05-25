@@ -7,6 +7,7 @@ import { AnalyticsService } from '../src/services/analytics.js';
 import { HeuristicAdvisor } from '../src/services/ai-advisor.js';
 import { SyntheticMarketData } from '../src/services/market-data.js';
 import { KnowledgeBaseSearch } from '../src/services/search.js';
+import type { Scraper, ScrapeResult } from '../src/services/scraping.js';
 
 describe('CollectionPipeline (offline doubles)', () => {
   let handle: DbHandle;
@@ -59,6 +60,32 @@ describe('CollectionPipeline (offline doubles)', () => {
     // and no candles are added the second time (idempotent upsert).
     expect(sym.candlesAdded).toBe(0);
     expect(sym.signalsInserted + sym.signalsUpdated + sym.signalsUnchanged).toBeGreaterThan(0);
+  });
+
+  it('runs the scraping pillar when a scraper is provided', async () => {
+    const scraped: string[] = [];
+    const fakeScraper: Scraper = {
+      name: 'fake',
+      async scrape(url: string): Promise<ScrapeResult> {
+        scraped.push(url);
+        return { url, title: 'Doc', content: 'body', contentHash: `hash:${url}` };
+      },
+      async close() {},
+    };
+    const withScraper = new CollectionPipeline(
+      store,
+      new SyntheticMarketData(),
+      new AnalyticsService(),
+      new KnowledgeBaseSearch(),
+      new HeuristicAdvisor(),
+      fakeScraper,
+    );
+
+    const report = await withScraper.collect('start', { symbols: ['BTCUSDT'], interval: '1h', limit: 120 });
+
+    expect(scraped.length).toBe(1);
+    expect(report.symbols[0].scrapesAdded).toBe(1);
+    expect((await store.tableCounts()).scrapes).toBe(1);
   });
 
   it('/start preserves the general search table across runs', async () => {

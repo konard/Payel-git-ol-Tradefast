@@ -54,6 +54,7 @@ function RunView({ report }: { report: RunReport }): React.ReactElement {
             <Text color={COLORS.muted}>
               {'  '}signals: +{s.signalsInserted} ~{s.signalsUpdated} ={s.signalsUnchanged} · candles +
               {s.candlesAdded}
+              {s.scrapesAdded > 0 ? ` · scrapes +${s.scrapesAdded}` : ''}
             </Text>
             <Text>
               {'  '}

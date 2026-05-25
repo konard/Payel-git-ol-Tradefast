@@ -87,3 +87,14 @@ export class ResilientScraper implements Scraper {
     }
   }
 }
+
+/**
+ * Returns a scraper when `LOSTFAST_SCRAPE` is enabled, otherwise `null`. Launching
+ * a headless browser is comparatively heavy and needs the Chromium binary, so it
+ * is opt-in: `/start` stays fast and fully offline by default, and the scraping
+ * pillar activates on demand with `LOSTFAST_SCRAPE=1`.
+ */
+export function createScraper(): Scraper | null {
+  const flag = (process.env.LOSTFAST_SCRAPE ?? '').toLowerCase();
+  return flag === '1' || flag === 'true' || flag === 'on' ? new ResilientScraper() : null;
+}

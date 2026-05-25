@@ -3,6 +3,7 @@ import { DEFAULT_PARAMETERS, type StrategyParameters } from '../domain/signal.js
 import { AnalyticsService, type SymbolAnalysis } from '../services/analytics.js';
 import { createAdvisor, type AiAdvisor } from '../services/ai-advisor.js';
 import { createMarketSource, type MarketDataSource } from '../services/market-data.js';
+import { createScraper, type Scraper } from '../services/scraping.js';
 import { KnowledgeBaseSearch, type SearchProvider } from '../services/search.js';
 
 export interface CollectOptions {
@@ -15,7 +16,7 @@ export interface CollectOptions {
 
 /** A single human-readable progress step, streamed to the UI as work proceeds. */
 export interface ProgressEvent {
-  phase: 'wipe' | 'fetch' | 'analyze' | 'persist' | 'search' | 'advise' | 'done';
+  phase: 'wipe' | 'fetch' | 'analyze' | 'persist' | 'search' | 'scrape' | 'advise' | 'done';
   symbol?: string;
   message: string;
   /** Completed steps out of {@link totalSteps}, for a progress bar. */
@@ -31,6 +32,7 @@ export interface SymbolReport {
   signalsInserted: number;
   signalsUpdated: number;
   signalsUnchanged: number;
+  scrapesAdded: number;
 }
 
 export interface RunReport {
@@ -61,6 +63,7 @@ export class CollectionPipeline {
     private readonly analytics: AnalyticsService = new AnalyticsService(),
     private readonly search: SearchProvider = new KnowledgeBaseSearch(),
     private readonly advisor: AiAdvisor = createAdvisor(),
+    private readonly scraper: Scraper | null = createScraper(),
   ) {}
 
   async collect(kind: RunKind, options: CollectOptions, onProgress?: ProgressListener): Promise<RunReport> {
@@ -70,9 +73,10 @@ export class CollectionPipeline {
     const params = options.params ?? DEFAULT_PARAMETERS;
     const symbols = options.symbols;
 
-    // Five work units per symbol (fetch, analyze, persist, search, advise) plus
-    // the optional wipe and the final summary step.
-    const totalSteps = symbols.length * 5 + (kind === 'start' ? 1 : 0) + 1;
+    // Work units per symbol: fetch, analyze, persist, search, advise (5), plus an
+    // optional scrape when enabled. Add the optional wipe and the final summary.
+    const perSymbol = this.scraper ? 6 : 5;
+    const totalSteps = symbols.length * perSymbol + (kind === 'start' ? 1 : 0) + 1;
     let step = 0;
     const emit = (e: Omit<ProgressEvent, 'step' | 'totalSteps'>) =>
       onProgress?.({ ...e, step: ++step, totalSteps });
@@ -125,6 +129,17 @@ export class CollectionPipeline {
       }
       searchCount += results.length;
 
+      let scrapesAdded = 0;
+      if (this.scraper) {
+        const target = results.find((r) => r.url)?.url;
+        emit({ phase: 'scrape', symbol, message: `Scraping reference for ${symbol}` });
+        if (target) {
+          const scraped = await this.scraper.scrape(target);
+          await this.store.saveScrape(runId, { symbol, ...scraped });
+          scrapesAdded = 1;
+        }
+      }
+
       emit({ phase: 'advise', symbol, message: `Generating AI insight for ${symbol}` });
       const insight = await this.advisor.advise(analysis);
       await this.store.saveInsight(runId, insight);
@@ -137,9 +152,11 @@ export class CollectionPipeline {
         signalsInserted: inserted,
         signalsUpdated: updated,
         signalsUnchanged: unchanged,
+        scrapesAdded,
       });
     }
 
+    if (this.scraper) await this.scraper.close();
     await this.store.finishRun(runId, 'completed');
     emit({ phase: 'done', message: `Run #${runId} completed for ${symbols.length} symbol(s)` });
 
