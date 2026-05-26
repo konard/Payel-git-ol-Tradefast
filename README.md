@@ -26,7 +26,12 @@ interactive terminal UI.
 - **Drizzle ORM** on PostgreSQL — runs on an **embedded PGlite** database with
   zero configuration, or on a real PostgreSQL server via `DATABASE_URL`.
 - **Interactive command set with precise lifecycle rules**: `/start`, `/update`,
-  `/news`, `/clear`, `/status`, `/strategies`, `/theme`, `/api`, `/help`, `/exit`.
+  `/backtest`, `/news`, `/clear`, `/status`, `/strategies`, `/theme`, `/api`,
+  `/help`, `/exit`.
+- **Walk-forward backtester**: `/backtest` replays history with the *same*
+  forecast logic the Trade Log shows and reports win rate, expectancy and profit
+  factor — so the forecasts can be validated against real price action instead of
+  trusted blindly.
 - **News crawler**: Playwright-backed source collection driven by
   `src/config/news-sources.json`, with per-source limits and resilient failures.
 - **Five pillars**: market math, analytics, search, scraping/news crawling
@@ -64,6 +69,7 @@ cron or Docker):
 ```bash
 npm run build                 # bundle to dist/index.js
 node dist/index.js start      # run a full analysis and exit
+node dist/index.js backtest   # replay history and print forecast accuracy
 node dist/index.js status     # print table counts + latest analytics
 node dist/index.js strategies # list strategies
 node dist/index.js news       # crawl configured market news sources
@@ -83,6 +89,7 @@ LOSTFAST_MARKET_SOURCE=synthetic LOSTFAST_DATA_DIR=:memory: node dist/index.js s
 | -------------- | ---------------------------------------------------------------------------- |
 | `/start`       | Run a full analysis. **Clears prior run data first**, then collects afresh. The general search table is **never** wiped. |
 | `/update`      | Re-analyse and persist **only what changed** (diff-aware upserts).           |
+| `/backtest`    | Replay history and report how often each forecast's take-profit was reached **before** its stop-loss (win rate, expectancy, profit factor). |
 | `/news`        | Crawl configured market news and economic-calendar sources into `news_items`. |
 | `/clear`       | Prune outdated runs, keeping the latest run and the general search table.    |
 | `/status`      | Show per-table row counts and the latest run's analytics.                    |
@@ -147,6 +154,55 @@ degrades to a neutral signal rather than taking the whole run down.
 
 ---
 
+## Backtesting forecast accuracy
+
+A forecast is only as trustworthy as its track record, so `/backtest` measures
+that record directly. It is a **walk-forward** simulation: for every evaluable
+bar it rebuilds the exact forecast a user would have seen at that moment
+(`buildForecast` over the candles known *up to that point*), then replays the
+*future* bars to decide whether the take-profit or the stop-loss was hit first.
+
+The forecast logic is shared with the Trade Log through a single source of truth
+(`src/strategies/forecast.ts`), so the metrics describe the live system — not a
+different model fit to history. The simulation is deliberately conservative:
+
+- **No look-ahead.** A forecast made on the close of bar `i` is resolved only
+  against bars `> i`.
+- **Non-overlapping trades.** The next entry is considered only after the
+  previous trade closes.
+- **Stop-first tie-break.** When a single bar straddles both levels, the stop is
+  assumed to fill first, so the reported edge is never flattering.
+
+Each trade is scored in **R-multiples** (multiples of the risked stop distance):
+a take-profit at the 2:1 target earns `+2R`, a stop costs `−1R`. The report rolls
+these up per symbol and across the portfolio:
+
+```bash
+node dist/index.js backtest
+```
+
+```
+Backtest — forecast accuracy (TP before SL)
+╭──────────┬────────┬───────┬─────────┬───────────────╮
+│ Currency │ Trades │ Win % │ Exp (R) │ Profit factor │
+├──────────┼────────┼───────┼─────────┼───────────────┤
+│ SOLUSDT  │ 12     │ 41.7% │ +0.18   │ 1.31          │
+│ ETHUSDT  │ 9      │ 33.3% │ -0.05   │ 0.92          │
+├──────────┼────────┼───────┼─────────┼───────────────┤
+│ TOTAL    │ 21     │ 38.1% │ +0.08   │ 1.13          │
+╰──────────┴────────┴───────┴─────────┴───────────────╯
+```
+
+- **Win %** — winning trades / decided trades (TP or SL; timeouts excluded).
+- **Exp (R)** — mean R per trade, the system's expectancy. Positive is an edge.
+- **Profit factor** — gross winning R / gross losing R; `> 1` is profitable,
+  `∞` when nothing lost.
+
+Use it before trading a symbol: a negative expectancy or a profit factor below 1
+means the forecasts have *not* held up on that instrument's recent history.
+
+---
+
 ## Architecture
 
 Clean architecture with small, single-purpose files (SOLID, dependency
@@ -156,10 +212,10 @@ injection throughout):
 src/
   domain/       Candle, Money, Signal, Symbol — pure types & value objects
   strategies/   indicators, mathx, position-sizer, 13 strategy implementations,
-                the engine and registry
+                the engine, registry and forecast (the trade the system suggests)
   risk/         risk limits, validator and the strategy↔risk orchestrator
   db/           Drizzle schema, the driver-agnostic client, the LostfastStore
-  services/     market-data, analytics, search, scraping/news crawling, ai-advisor
+  services/     market-data, analytics, backtest, search, scraping/news, ai-advisor
   backend/      NestJS + Apollo GraphQL wrapper around the Lostfast facade
   pipeline/     CollectionPipeline — orchestrates a full run end to end
   app/          Lostfast facade (owns the db, store and pipeline)
@@ -332,9 +388,11 @@ npm run typecheck # tsc --noEmit
 ```
 
 The suite covers indicator/math accuracy, position sizing and `Money` exactness,
-strategy behaviour on crafted trend/range data, the store's lifecycle rules
-(`/start` wipe, `/update` diff, `/clear` prune) against an in-memory PGlite
-database, and the full collection pipeline end to end with offline doubles.
+strategy behaviour on crafted trend/range data, the forecast brackets and the
+walk-forward backtester (R-multiple math, the stop-first tie-break and the
+no-look-ahead guarantee), the store's lifecycle rules (`/start` wipe, `/update`
+diff, `/clear` prune) against an in-memory PGlite database, and the full
+collection pipeline end to end with offline doubles.
 
 ---
 

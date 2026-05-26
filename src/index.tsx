@@ -15,6 +15,7 @@ import { getTheme, themeGradient, themeNames, type ThemeName } from './cli/theme
 import { getExchange, exchangeNames, type ExchangeName } from './cli/exchanges.js';
 import { getInterval, intervalNames } from './cli/intervals.js';
 import { loadPreferences, saveTheme, saveExchange, saveInterval } from './cli/preferences.js';
+import { renderBacktestLines } from './cli/backtest-log.js';
 import { renderTradeLogLines } from './cli/trade-log.js';
 import { loadConfig } from './config.js';
 
@@ -104,6 +105,9 @@ async function runHeadless(command: string): Promise<number> {
     } else if (name === 'clear') {
       const pruned = await app.clear();
       process.stdout.write(`Pruned ${pruned} outdated run(s). Search table preserved.\n`);
+    } else if (name === 'backtest') {
+      const report = await app.backtest(reportProgress);
+      process.stdout.write(`${renderBacktestLines(report).join('\n')}\n`);
     } else if (name === 'news') {
       const report = await app.news(reportProgress);
       const failed = report.sources.filter((source) => source.failed);

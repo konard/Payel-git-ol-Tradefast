@@ -501,6 +501,8 @@ export function App({ app, version, apiUrl }: AppProps): React.ReactElement {
             ? app.start((e) => setProgress(e))
             : app.update((e) => setProgress(e)));
           push({ kind: 'run', report });
+        } else if (name === 'backtest') {
+          push({ kind: 'backtest', report: await app.backtest((e) => setProgress(e)) });
         } else if (name === 'news') {
           push({ kind: 'news', report: await app.news((e) => setProgress(e)) });
         } else if (name === 'status') {

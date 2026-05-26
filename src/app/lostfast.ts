@@ -4,7 +4,13 @@ import type { AnalyticsRow } from '../db/store.js';
 import { loadConfig, type LostfastConfig } from '../config.js';
 import type { Candle } from '../domain/candle.js';
 import { CollectionPipeline, type ProgressListener, type RunReport } from '../pipeline/collector.js';
-import { createResilientMarketSourceFor } from '../services/market-data.js';
+import {
+  aggregateBacktests,
+  backtestSymbol,
+  type BacktestReport,
+  type BacktestResult,
+} from '../services/backtest.js';
+import { createResilientMarketSourceFor, type MarketDataSource } from '../services/market-data.js';
 import {
   createNewsCrawler,
   type NewsCrawler,
@@ -36,6 +42,17 @@ export interface PersistedNewsCrawlReport extends NewsCrawlReport {
   unchanged: number;
 }
 
+/** Options accepted by {@link Lostfast.backtest}. */
+export interface BacktestRunOptions {
+  /** Bars of warm-up history before the first forecast. */
+  warmup?: number;
+  /** Maximum bars to hold a trade before closing at market. */
+  horizon?: number;
+}
+
+/** Streamed per-symbol progress for the backtest command. */
+export type BacktestProgressListener = (event: { message: string; step: number; totalSteps: number }) => void;
+
 /**
  * The application facade. It owns the database handle, the store and the
  * collection pipeline, and exposes the lifecycle/news operations the CLI needs
@@ -46,9 +63,10 @@ export class Lostfast {
   private constructor(
     private readonly handle: DbHandle,
     private readonly store: LostfastStore,
-    private readonly pipeline: CollectionPipeline,
+    private pipeline: CollectionPipeline,
     private readonly newsCrawler: NewsCrawler,
     readonly config: LostfastConfig,
+    private market: MarketDataSource,
   ) {}
 
   static async create(config: LostfastConfig = loadConfig()): Promise<Lostfast> {
@@ -57,7 +75,7 @@ export class Lostfast {
     const market = createResilientMarketSourceFor(config.exchange);
     const pipeline = new CollectionPipeline(store, market);
     const newsCrawler = await createNewsCrawler();
-    return new Lostfast(handle, store, pipeline, newsCrawler, config);
+    return new Lostfast(handle, store, pipeline, newsCrawler, config, market);
   }
 
   /** Updates the exchange used for market data on subsequent /start and /update.
@@ -65,8 +83,8 @@ export class Lostfast {
    */
   setExchange(name: string): void {
     (this.config as any).exchange = name;
-    const market = createResilientMarketSourceFor(name);
-    (this as any).pipeline = new CollectionPipeline(this.store, market);
+    this.market = createResilientMarketSourceFor(name);
+    this.pipeline = new CollectionPipeline(this.store, this.market);
   }
 
   setInterval(interval: string): void {
@@ -104,6 +122,37 @@ export class Lostfast {
       },
       onProgress,
     );
+  }
+
+  /**
+   * `/backtest` — replay history and report how often each forecast's
+   * take-profit was reached before its stop-loss. Uses the same forecast logic
+   * the Trade Log shows, so the metrics describe the live system, not a
+   * different model.
+   */
+  async backtest(
+    onProgress?: BacktestProgressListener,
+    options: BacktestRunOptions = {},
+  ): Promise<BacktestReport> {
+    const interval = this.config.interval;
+    const limit = this.config.candleLimit;
+    const symbols = this.config.symbols;
+    const results: BacktestResult[] = [];
+
+    let step = 0;
+    for (const symbol of symbols) {
+      onProgress?.({ message: `Backtesting ${symbol} on ${interval}`, step: ++step, totalSteps: symbols.length });
+      const candles = await this.market.getCandles(symbol, interval, limit);
+      results.push(
+        backtestSymbol(candles, symbol, {
+          warmup: options.warmup,
+          horizon: options.horizon,
+          accountBalance: this.config.accountBalance,
+        }),
+      );
+    }
+
+    return aggregateBacktests(results);
   }
 
   /** `/currency` — run a full forecast for a single symbol, including news consensus. */

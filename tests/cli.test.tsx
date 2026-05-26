@@ -8,9 +8,11 @@ import { completeCommand, parseCommand, suggestCommands } from '../src/cli/comma
 import { OutputLine } from '../src/cli/output.js';
 import { getTheme, themeNames } from '../src/cli/theme.js';
 import { getExchange, exchangeNames, type ExchangeName } from '../src/cli/exchanges.js';
+import { renderBacktestLines } from '../src/cli/backtest-log.js';
 import { renderTradeLogLines } from '../src/cli/trade-log.js';
 import { Money } from '../src/domain/money.js';
 import type { RunReport } from '../src/pipeline/collector.js';
+import type { BacktestReport } from '../src/services/backtest.js';
 
 const fakeApp = {
   driver: 'test',
@@ -105,7 +107,23 @@ describe('command autocomplete', () => {
 
 describe('cli themes', () => {
   it('provides multiple named palettes with distinct text colors', () => {
-    expect(themeNames()).toEqual(['violet', 'ocean', 'ember', 'forest', 'mono']);
+    expect(themeNames()).toEqual([
+      'violet',
+      'ocean',
+      'ember',
+      'forest',
+      'mono',
+      'midnight',
+      'sunset',
+      'lime',
+      'cyberpunk',
+      'nord',
+      'royal',
+      'candy',
+      'dracula',
+      'sakura',
+      'matrix',
+    ]);
     expect(getTheme('ocean').colors.info).not.toBe(getTheme('ember').colors.info);
     expect(getTheme('unknown').name).toBe('violet');
   });
@@ -242,5 +260,55 @@ describe('run output', () => {
     };
 
     expect(renderTradeLogLines(noActionReport)).toContain('│ BTCUSDT  │           │    │    │ 100.00      │');
+  });
+});
+
+describe('backtest output', () => {
+  const report: BacktestReport = {
+    results: [
+      { symbol: 'BTCUSDT', candles: 200, trades: 5, wins: 3, losses: 2, timeouts: 0, winRate: 0.6, expectancy: 0.4, totalR: 2, profitFactor: 2, outcomes: [] },
+      { symbol: 'ETHUSDT', candles: 200, trades: 4, wins: 1, losses: 3, timeouts: 0, winRate: 0.25, expectancy: -0.25, totalR: -1, profitFactor: 0.5, outcomes: [] },
+    ],
+    totals: { symbols: 2, trades: 9, wins: 4, losses: 5, timeouts: 0, winRate: 4 / 9, expectancy: 1 / 9, totalR: 1, profitFactor: 1.33 },
+  };
+
+  it('renders a bordered accuracy table with per-symbol rows and a TOTAL rollup', () => {
+    expect(renderBacktestLines(report)).toEqual([
+      'Backtest — forecast accuracy (TP before SL)',
+      '╭──────────┬────────┬───────┬─────────┬───────────────╮',
+      '│ Currency │ Trades │ Win % │ Exp (R) │ Profit factor │',
+      '├──────────┼────────┼───────┼─────────┼───────────────┤',
+      '│ BTCUSDT  │ 5      │ 60.0% │ +0.40   │ 2.00          │',
+      '│ ETHUSDT  │ 4      │ 25.0% │ -0.25   │ 0.50          │',
+      '├──────────┼────────┼───────┼─────────┼───────────────┤',
+      '│ TOTAL    │ 9      │ 44.4% │ +0.11   │ 1.33          │',
+      '╰──────────┴────────┴───────┴─────────┴───────────────╯',
+    ]);
+  });
+
+  it('shows an em dash for win rate and profit factor when a symbol has no decided trades', () => {
+    const empty: BacktestReport = {
+      results: [
+        { symbol: 'XRPUSDT', candles: 50, trades: 0, wins: 0, losses: 0, timeouts: 0, winRate: 0, expectancy: 0, totalR: 0, profitFactor: 0, outcomes: [] },
+      ],
+      totals: { symbols: 1, trades: 0, wins: 0, losses: 0, timeouts: 0, winRate: 0, expectancy: 0, totalR: 0, profitFactor: 0 },
+    };
+
+    const lines = renderBacktestLines(empty);
+    expect(lines).toContain('│ XRPUSDT  │ 0      │ —     │ +0.00   │ —             │');
+  });
+
+  it('renders the bordered backtest table in interactive output', () => {
+    const tallStdout = { rows: 80, columns: 120, write: () => {}, on: () => {}, removeListener: () => {} } as any;
+    const { lastFrame, unmount } = render(
+      <OutputLine item={{ id: 1, kind: 'backtest', report }} theme={getTheme('violet')} />,
+      { stdout: tallStdout },
+    );
+
+    const frame = lastFrame();
+    expect(frame).toContain('Backtest — forecast accuracy (TP before SL)');
+    expect(frame).toContain('│ BTCUSDT  │ 5      │ 60.0% │ +0.40   │ 2.00          │');
+    expect(frame).toContain('│ TOTAL    │ 9      │ 44.4% │ +0.11   │ 1.33          │');
+    unmount();
   });
 });

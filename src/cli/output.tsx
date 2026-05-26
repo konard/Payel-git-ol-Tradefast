@@ -3,7 +3,9 @@ import React from 'react';
 
 import type { PersistedNewsCrawlReport, StatusReport } from '../app/lostfast.js';
 import type { RunReport } from '../pipeline/collector.js';
+import type { BacktestReport } from '../services/backtest.js';
 import { Banner } from './Banner.js';
+import { renderBacktestParts } from './backtest-log.js';
 import type { ChartData } from './chart.js';
 import { CandleChartView } from './chart.js';
 import { directionColor, type CliTheme } from './theme.js';
@@ -16,6 +18,7 @@ export type OutputItem =
   | { id: number; kind: 'text'; text: string; color?: string }
   | { id: number; kind: 'error'; text: string }
   | { id: number; kind: 'run'; report: RunReport }
+  | { id: number; kind: 'backtest'; report: BacktestReport }
   | { id: number; kind: 'news'; report: PersistedNewsCrawlReport }
   | { id: number; kind: 'status'; status: StatusReport }
   | { id: number; kind: 'strategies'; list: { id: string; title: string }[] }
@@ -47,6 +50,50 @@ function RunView({ report, theme }: { report: RunReport; theme: CliTheme }): Rea
                 <Text
                   color={part.kind === 'row' && cell.key === 'direction' ? directionColor(cell.value, theme) : undefined}
                 >
+                  {cell.text}
+                </Text>
+                <Text color={theme.colors.muted}>│</Text>
+              </React.Fragment>
+            ))}
+          </Text>
+        );
+      })}
+    </Box>
+  );
+}
+
+/** Green for a positive edge, red for a negative one, muted for break-even. */
+function edgeColor(value: string, theme: CliTheme): string {
+  if (value.startsWith('-')) return theme.colors.short;
+  if (value.startsWith('+') && Number.parseFloat(value) !== 0) return theme.colors.long;
+  return theme.colors.muted;
+}
+
+function BacktestView({ report, theme }: { report: BacktestReport; theme: CliTheme }): React.ReactElement {
+  const parts = renderBacktestParts(report);
+
+  return (
+    <Box flexDirection="column" marginY={1}>
+      {parts.map((part, index) => {
+        if ('text' in part) {
+          return (
+            <Text
+              key={`${index}:${part.text}`}
+              bold={part.kind === 'title'}
+              color={part.kind === 'title' ? theme.colors.accent : theme.colors.muted}
+            >
+              {part.text}
+            </Text>
+          );
+        }
+
+        const emphasise = part.kind === 'header' || part.kind === 'total';
+        return (
+          <Text key={`${index}:${part.kind}`} bold={emphasise}>
+            <Text color={theme.colors.muted}>│</Text>
+            {part.cells.map((cell) => (
+              <React.Fragment key={cell.key}>
+                <Text color={part.kind === 'row' && cell.key === 'expectancy' ? edgeColor(cell.value, theme) : undefined}>
                   {cell.text}
                 </Text>
                 <Text color={theme.colors.muted}>│</Text>
@@ -184,6 +231,8 @@ export function OutputLine({
       return <Text color={theme.colors.error}>✗ {item.text}</Text>;
     case 'run':
       return <RunView report={item.report} theme={theme} />;
+    case 'backtest':
+      return <BacktestView report={item.report} theme={theme} />;
     case 'news':
       return <NewsView report={item.report} theme={theme} />;
     case 'status':

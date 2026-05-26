@@ -7,6 +7,7 @@ export interface CommandSpec {
 export const COMMANDS: CommandSpec[] = [
   { name: '/start', summary: 'Run a full analysis; clears prior run data, keeps the search table' },
   { name: '/update', summary: 'Re-analyse and persist only what changed' },
+  { name: '/backtest', summary: 'Replay history to measure forecast accuracy (win rate, expectancy)' },
   { name: '/news', summary: 'Crawl configured market news and economic-calendar sources' },
   { name: '/clear', summary: 'Prune outdated runs (the general search table is preserved)' },
   { name: '/status', summary: 'Show table counts and the latest run analytics' },
@@ -23,6 +24,7 @@ export const COMMANDS: CommandSpec[] = [
 export type CommandName =
   | 'start'
   | 'update'
+  | 'backtest'
   | 'news'
   | 'clear'
   | 'status'
@@ -49,6 +51,7 @@ export function parseCommand(raw: string): ParsedCommand {
   switch (token) {
     case 'start':
     case 'update':
+    case 'backtest':
     case 'news':
     case 'clear':
     case 'status':
