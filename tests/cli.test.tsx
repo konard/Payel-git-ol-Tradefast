@@ -28,6 +28,7 @@ describe('command autocomplete', () => {
   it('suggests commands by partial slash input', () => {
     expect(suggestCommands('/stat').map((c) => c.name)).toEqual(['/status']);
     expect(suggestCommands('st').map((c) => c.name)).toEqual(['/start', '/status', '/strategies']);
+    expect(suggestCommands('ne').map((c) => c.name)).toEqual(['/news']);
   });
 
   it('completes unambiguous command prefixes', () => {
@@ -38,6 +39,7 @@ describe('command autocomplete', () => {
 
   it('parses theme command arguments', () => {
     expect(parseCommand('/theme ocean')).toMatchObject({ name: 'theme', token: 'theme', args: ['ocean'] });
+    expect(parseCommand('/news')).toMatchObject({ name: 'news', token: 'news', args: [] });
   });
 
   it('renders the interactive shell and accepts input', async () => {

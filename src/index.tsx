@@ -75,6 +75,19 @@ async function runHeadless(command: string): Promise<number> {
     } else if (name === 'clear') {
       const pruned = await app.clear();
       process.stdout.write(`Pruned ${pruned} outdated run(s). Search table preserved.\n`);
+    } else if (name === 'news') {
+      const report = await app.news(reportProgress);
+      const failed = report.sources.filter((source) => source.failed);
+      process.stdout.write(
+        `News crawl: ${report.items.length} item(s), +${report.inserted} ~${report.updated} =${report.unchanged}, ${failed.length} failed source(s).\n`,
+      );
+      for (const source of report.sources) {
+        process.stdout.write(
+          `  ${source.sourceId.padEnd(32)} ${
+            source.failed ? `failed: ${source.error}` : `${source.accepted}/${source.fetched}`
+          }\n`,
+        );
+      }
     } else {
       const runReport = await (name === 'start' ? app.start(reportProgress) : app.update(reportProgress));
       for (const s of runReport.symbols) {

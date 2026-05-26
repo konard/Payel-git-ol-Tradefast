@@ -1,0 +1,98 @@
+[
+  {
+    "id": "investing-economic-calendar",
+    "title": "Investing.com Economic Calendar",
+    "kind": "economic-calendar",
+    "url": "https://ru.investing.com/economic-calendar",
+    "enabled": true,
+    "maxItems": 10
+  },
+  {
+    "id": "tradingview-economic-calendar",
+    "title": "TradingView Economic Calendar",
+    "kind": "economic-calendar",
+    "url": "https://ru.tradingview.com/economic-calendar/",
+    "enabled": true,
+    "maxItems": 10
+  },
+  {
+    "id": "alfaforex-economic-calendar",
+    "title": "Alfa-Forex Economic Calendar",
+    "kind": "economic-calendar",
+    "url": "https://alfaforex.ru/economic-calendar/",
+    "enabled": true,
+    "maxItems": 10
+  },
+  {
+    "id": "fxclub-economic-calendar",
+    "title": "Forex Club Economic Calendar",
+    "kind": "economic-calendar",
+    "url": "https://www.fxclub.org/economcalendar",
+    "enabled": true,
+    "maxItems": 10
+  },
+  {
+    "id": "tradingview-news",
+    "title": "TradingView News",
+    "kind": "news",
+    "url": "https://ru.tradingview.com/news/",
+    "enabled": true,
+    "maxItems": 8
+  },
+  {
+    "id": "investing-news",
+    "title": "Investing.com News",
+    "kind": "news",
+    "url": "https://ru.investing.com/news",
+    "enabled": true,
+    "maxItems": 8
+  },
+  {
+    "id": "rbc-finances",
+    "title": "RBC Finances",
+    "kind": "news",
+    "url": "https://www.rbc.ru/rubric/finances",
+    "enabled": true,
+    "maxItems": 8
+  },
+  {
+    "id": "kommersant-finance-theme",
+    "title": "Kommersant Finance Theme",
+    "kind": "news",
+    "url": "https://www.kommersant.ru/theme/137",
+    "enabled": true,
+    "maxItems": 8
+  },
+  {
+    "id": "mail-economics",
+    "title": "Mail.ru Economics",
+    "kind": "news",
+    "url": "https://news.mail.ru/economics/",
+    "enabled": true,
+    "maxItems": 8
+  },
+  {
+    "id": "litefinance-forex-news",
+    "title": "LiteFinance Forex News",
+    "kind": "news",
+    "url": "https://www.litefinance.org/ru/trading/forex-news/",
+    "enabled": true,
+    "maxItems": 8
+  },
+  {
+    "id": "euronews-markets",
+    "title": "Euronews Markets",
+    "kind": "news",
+    "url": "https://ru.euronews.com/tag/markets",
+    "enabled": true,
+    "maxItems": 8
+  },
+  {
+    "id": "tradingview-markets",
+    "title": "TradingView Markets",
+    "kind": "market",
+    "url": "https://ru.tradingview.com/markets/",
+    "enabled": true,
+    "maxItems": 8
+  }
+]

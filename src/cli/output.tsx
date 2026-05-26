@@ -1,7 +1,7 @@
 import { Box, Text } from 'ink';
 import React from 'react';
 
-import type { StatusReport } from '../app/lostfast.js';
+import type { PersistedNewsCrawlReport, StatusReport } from '../app/lostfast.js';
 import type { RunReport } from '../pipeline/collector.js';
 import { Banner } from './Banner.js';
 import { type CliTheme, directionColor } from './theme.js';
@@ -13,6 +13,7 @@ export type OutputItem =
   | { id: number; kind: 'text'; text: string; color?: string }
   | { id: number; kind: 'error'; text: string }
   | { id: number; kind: 'run'; report: RunReport }
+  | { id: number; kind: 'news'; report: PersistedNewsCrawlReport }
   | { id: number; kind: 'status'; status: StatusReport }
   | { id: number; kind: 'strategies'; list: { id: string; title: string }[] };
 
@@ -63,6 +64,37 @@ function RunView({ report, theme }: { report: RunReport; theme: CliTheme }): Rea
           </Box>
         );
       })}
+    </Box>
+  );
+}
+
+function NewsView({ report, theme }: { report: PersistedNewsCrawlReport; theme: CliTheme }): React.ReactElement {
+  const failed = report.sources.filter((source) => source.failed);
+  return (
+    <Box flexDirection="column" marginY={1}>
+      <Text>
+        <Text color={theme.colors.accent} bold>
+          ▌News crawl
+        </Text>{' '}
+        <Text color={theme.colors.muted}>
+          ({report.sources.length} source(s), {report.items.length} item(s), {report.durationMs}ms)
+        </Text>
+      </Text>
+      <Text color={theme.colors.muted}>
+        {'  '}news items: +{report.inserted} ~{report.updated} ={report.unchanged}
+      </Text>
+      {report.sources.slice(0, 8).map((source) => (
+        <Text key={source.sourceId} color={source.failed ? theme.colors.error : theme.colors.muted}>
+          {'  '}
+          {source.sourceId.padEnd(32)} {source.failed ? `failed: ${source.error}` : `${source.accepted}/${source.fetched}`}
+        </Text>
+      ))}
+      {report.sources.length > 8 ? (
+        <Text color={theme.colors.muted}>{'  '}...{report.sources.length - 8} more source(s)</Text>
+      ) : null}
+      {failed.length > 0 ? (
+        <Text color={theme.colors.error}>{'  '}failed sources: {failed.map((source) => source.sourceId).join(', ')}</Text>
+      ) : null}
     </Box>
   );
 }
@@ -137,6 +169,8 @@ export function OutputLine({
       return <Text color={theme.colors.error}>✗ {item.text}</Text>;
     case 'run':
       return <RunView report={item.report} theme={theme} />;
+    case 'news':
+      return <NewsView report={item.report} theme={theme} />;
     case 'status':
       return <StatusView status={item.status} theme={theme} />;
     case 'strategies':

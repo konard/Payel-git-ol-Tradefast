@@ -4,7 +4,6 @@ import TextInput from 'ink-text-input';
 import React, { useCallback, useRef, useState } from 'react';
 
 import type { Lostfast } from '../app/lostfast.js';
-import type { ProgressEvent } from '../pipeline/collector.js';
 import { COMMANDS, completeCommand, parseCommand, suggestCommands, type CommandSpec } from './commands.js';
 import { OutputLine, type OutputItem } from './output.js';
 import { saveTheme } from './preferences.js';
@@ -67,7 +66,7 @@ export function App({ app, version, apiUrl }: AppProps): React.ReactElement {
   const [themeSelectorOpen, setThemeSelectorOpen] = useState(false);
   const [selectedThemeIndex, setSelectedThemeIndex] = useState(0);
   const [busy, setBusy] = useState(false);
-  const [progress, setProgress] = useState<ProgressEvent | null>(null);
+  const [progress, setProgress] = useState<{ message: string; step: number; totalSteps: number } | null>(null);
   const nextId = useRef(1);
 
   // Distributive omit so each union member keeps its own discriminant + fields.
@@ -177,6 +176,8 @@ export function App({ app, version, apiUrl }: AppProps): React.ReactElement {
             ? app.start((e) => setProgress(e))
             : app.update((e) => setProgress(e)));
           push({ kind: 'run', report });
+        } else if (name === 'news') {
+          push({ kind: 'news', report: await app.news((e) => setProgress(e)) });
         } else if (name === 'status') {
           push({ kind: 'status', status: await app.status() });
         } else if (name === 'clear') {

@@ -5,8 +5,9 @@
 
 LØSTFΛST fetches OHLCV candles, runs **13 trading strategies** over them,
 sizes positions with volatility-aware risk management, indexes a knowledge base,
-optionally scrapes references with Playwright, and narrates the result through a
-pluggable AI advisor — all from a polished interactive terminal UI.
+optionally scrapes references and crawls market news with Playwright, and
+narrates the result through a pluggable AI advisor — all from a polished
+interactive terminal UI.
 
 ![LØSTFΛST CLI](docs/screenshots/cli.png)
 
@@ -25,9 +26,12 @@ pluggable AI advisor — all from a polished interactive terminal UI.
 - **Drizzle ORM** on PostgreSQL — runs on an **embedded PGlite** database with
   zero configuration, or on a real PostgreSQL server via `DATABASE_URL`.
 - **Interactive command set with precise lifecycle rules**: `/start`, `/update`,
-  `/clear`, `/status`, `/strategies`, `/theme`, `/api`, `/help`, `/exit`.
-- **Five pillars**: market math, analytics, search, scraping (Playwright) and an
-  AI advisor — each behind a small interface, dependency-injected and testable.
+  `/news`, `/clear`, `/status`, `/strategies`, `/theme`, `/api`, `/help`, `/exit`.
+- **News crawler**: Playwright-backed source collection driven by
+  `src/config/news-sources.json`, with per-source limits and resilient failures.
+- **Five pillars**: market math, analytics, search, scraping/news crawling
+  (Playwright) and an AI advisor — each behind a small interface,
+  dependency-injected and testable.
 - **Works offline or live**: deterministic synthetic market data keeps CI and
   demos reproducible; Binance, CoinGecko and MEXC adapters can pull real crypto
   market rates.
@@ -62,6 +66,7 @@ npm run build                 # bundle to dist/index.js
 node dist/index.js start      # run a full analysis and exit
 node dist/index.js status     # print table counts + latest analytics
 node dist/index.js strategies # list strategies
+node dist/index.js news       # crawl configured market news sources
 ```
 
 Want a fully deterministic, offline run? Use the synthetic market source:
@@ -78,6 +83,7 @@ LOSTFAST_MARKET_SOURCE=synthetic LOSTFAST_DATA_DIR=:memory: node dist/index.js s
 | -------------- | ---------------------------------------------------------------------------- |
 | `/start`       | Run a full analysis. **Clears prior run data first**, then collects afresh. The general search table is **never** wiped. |
 | `/update`      | Re-analyse and persist **only what changed** (diff-aware upserts).           |
+| `/news`        | Crawl configured market news and economic-calendar sources into `news_items`. |
 | `/clear`       | Prune outdated runs, keeping the latest run and the general search table.    |
 | `/status`      | Show per-table row counts and the latest run's analytics.                    |
 | `/strategies`  | List every available strategy.                                               |
@@ -89,6 +95,8 @@ LOSTFAST_MARKET_SOURCE=synthetic LOSTFAST_DATA_DIR=:memory: node dist/index.js s
 The leading slash is optional. The "general search results" table
 (`search_results`) is the one table that **survives `/start` and `/clear`** — it
 accumulates discoveries across every session, exactly as required.
+Collected `news_items` also survive these lifecycle commands so news history can
+feed a future market-assessment model.
 
 While typing a command, Lostfast shows matching command suggestions. Press
 `Tab` to complete an unambiguous command prefix. Run `/theme` to open the theme
@@ -151,7 +159,7 @@ src/
                 the engine and registry
   risk/         risk limits, validator and the strategy↔risk orchestrator
   db/           Drizzle schema, the driver-agnostic client, the LostfastStore
-  services/     market-data, analytics, search, scraping (Playwright), ai-advisor
+  services/     market-data, analytics, search, scraping/news crawling, ai-advisor
   backend/      NestJS + Apollo GraphQL wrapper around the Lostfast facade
   pipeline/     CollectionPipeline — orchestrates a full run end to end
   app/          Lostfast facade (owns the db, store and pipeline)
@@ -179,10 +187,11 @@ PGlite database (default) and on a real PostgreSQL server.
 | `scrapes`        | scraping   | Playwright page text, deduplicated by content hash           |
 | `ai_insights`    | AI         | Advisor summaries per symbol per run                         |
 | `search_results` | search     | **The general table — survives `/start` and `/clear`**       |
+| `news_items`     | news       | Configured source headlines/events for future assessment      |
 
 `/start` wipes the ephemeral tables (`signals`, `analytics`, `scrapes`,
 `ai_insights`, `candles`, `runs`); `/clear` keeps only the most recent run. The
-`search_results` table is excluded from both.
+`search_results` and `news_items` tables are excluded from both.
 
 Migrations live in `drizzle/` and are applied automatically on connect. To
 regenerate them after a schema change:
@@ -214,6 +223,8 @@ All configuration is environment-driven (see `.env.example`):
 | `LOSTFAST_API_HOST`       | `127.0.0.1`                   | GraphQL bind host.                                             |
 | `LOSTFAST_API_PORT`       | `0`                           | GraphQL bind port (`0` selects a free port).                    |
 | `LOSTFAST_SCRAPE`         | `0`                           | Set to `1` to enable the Playwright scraping pillar.           |
+| `LOSTFAST_NEWS_SOURCES_FILE` | `src/config/news-sources.json` | Optional custom JSON source list for `/news`.                |
+| `LOSTFAST_NEWS_LIMIT`     | `8`                           | Default max accepted items per source during `/news`.          |
 | `ANTHROPIC_API_KEY`       | _(unset → heuristic)_        | When set, the AI advisor calls the Anthropic API.              |
 | `LOSTFAST_AI_MODEL`       | `claude-opus-4-7`             | Model used by the Anthropic advisor.                           |
 
@@ -256,6 +267,29 @@ browser with:
 ```bash
 npx playwright install chromium
 ```
+
+## News Crawler
+
+The `/news` command crawls the market/economic sources listed in
+`src/config/news-sources.json` and upserts normalized items into `news_items`.
+Each source has an id, title, kind, URL, enabled flag and optional per-source
+limit. The default file contains the sources from issue #9:
+
+- Investing, TradingView, Alfa-Forex and Forex Club economic calendars.
+- TradingView, Investing, RBC, Kommersant, Mail.ru, LiteFinance and Euronews
+  market/economics news pages.
+- TradingView markets.
+
+Run it from the interactive shell or in one-shot mode:
+
+```bash
+node dist/index.js news
+```
+
+The crawler uses a lazy headless Chromium instance, scrolls each source page,
+extracts likely article/event links, normalizes URLs and deduplicates by source
+and title. A failing source is recorded in the crawl report but does not stop
+the remaining sources.
 
 ---
 

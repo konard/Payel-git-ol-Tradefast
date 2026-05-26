@@ -1,11 +1,13 @@
 import { and, desc, eq, lt, sql } from 'drizzle-orm';
 
 import type { Candle } from '../domain/candle.js';
+import type { NewsItem } from '../services/news-crawler.js';
 import type { LostfastDb } from './client.js';
 import {
   aiInsights,
   analytics,
   candles as candlesTable,
+  newsItems,
   runs,
   scrapes,
   searchResults,
@@ -252,10 +254,52 @@ export class LostfastStore {
       });
   }
 
+  // --- News items (general, persistent table) -----------------------------
+
+  async saveNewsItem(row: NewsItem): Promise<'inserted' | 'updated' | 'unchanged'> {
+    const [existing] = await this.db
+      .select()
+      .from(newsItems)
+      .where(and(eq(newsItems.sourceId, row.sourceId), eq(newsItems.title, row.title)))
+      .limit(1);
+
+    if (existing?.contentHash === row.contentHash) return 'unchanged';
+
+    await this.db
+      .insert(newsItems)
+      .values({
+        sourceId: row.sourceId,
+        sourceTitle: row.sourceTitle,
+        sourceUrl: row.sourceUrl,
+        kind: row.kind,
+        title: row.title,
+        url: row.url ?? null,
+        summary: row.summary ?? null,
+        publishedAt: row.publishedAt ? new Date(row.publishedAt) : null,
+        contentHash: row.contentHash,
+        fetchedAt: new Date(row.fetchedAt),
+      })
+      .onConflictDoUpdate({
+        target: [newsItems.sourceId, newsItems.title],
+        set: {
+          sourceTitle: row.sourceTitle,
+          sourceUrl: row.sourceUrl,
+          kind: row.kind,
+          url: row.url ?? null,
+          summary: row.summary ?? null,
+          publishedAt: row.publishedAt ? new Date(row.publishedAt) : null,
+          contentHash: row.contentHash,
+          fetchedAt: new Date(row.fetchedAt),
+        },
+      });
+
+    return existing ? 'updated' : 'inserted';
+  }
+
   // --- Read helpers for the UI --------------------------------------------
 
   async tableCounts(): Promise<Record<string, number>> {
-    const tables = { runs, candles: candlesTable, signals, analytics, scrapes, aiInsights, searchResults };
+    const tables = { runs, candles: candlesTable, signals, analytics, scrapes, aiInsights, searchResults, newsItems };
     const entries = await Promise.all(
       Object.entries(tables).map(async ([name, table]) => {
         const [row] = await this.db.select({ count: sql<number>`count(*)::int` }).from(table);

@@ -146,5 +146,32 @@ export const searchResults = pgTable(
   }),
 );
 
-/** Tables that `/start` wipes and `/clear` prunes. The general table is excluded. */
+/**
+ * Market and economic news collected from configured source pages. It survives
+ * `/start` and `/clear`, like the general search table, so future market
+ * assessment can build a durable news history.
+ */
+export const newsItems = pgTable(
+  'news_items',
+  {
+    id: serial('id').primaryKey(),
+    sourceId: varchar('source_id', { length: 80 }).notNull(),
+    sourceTitle: text('source_title').notNull(),
+    sourceUrl: text('source_url').notNull(),
+    kind: varchar('kind', { length: 32 }).notNull(),
+    title: text('title').notNull(),
+    url: text('url'),
+    summary: text('summary'),
+    publishedAt: timestamp('published_at', { withTimezone: true }),
+    contentHash: varchar('content_hash', { length: 64 }).notNull(),
+    fetchedAt: timestamp('fetched_at', { withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => ({
+    uniq: uniqueIndex('news_items_source_title_uq').on(t.sourceId, t.title),
+    bySource: index('news_items_source_idx').on(t.sourceId),
+    byFetchedAt: index('news_items_fetched_at_idx').on(t.fetchedAt),
+  }),
+);
+
+/** Tables that `/start` wipes and `/clear` prunes. The general tables are excluded. */
 export const EPHEMERAL_TABLES = [signals, analytics, scrapes, aiInsights, candles, runs] as const;
