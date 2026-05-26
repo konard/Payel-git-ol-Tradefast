@@ -50,6 +50,29 @@ describe('command autocomplete', () => {
     expect(lastFrame()).toContain('/status');
     unmount();
   });
+
+  it('opens a theme selector window and applies the selected theme', async () => {
+    const { lastFrame, stdin, unmount } = render(
+      <App app={fakeApp} version="0.0.0-test" apiUrl="http://127.0.0.1:8787/graphql" />,
+    );
+
+    stdin.write('/theme');
+    await new Promise((resolve) => setTimeout(resolve, 0));
+    stdin.write('\r');
+    await new Promise((resolve) => setTimeout(resolve, 0));
+
+    expect(lastFrame()).toContain('Select theme');
+    expect(lastFrame()).toContain('Violet');
+    expect(lastFrame()).toContain('Ocean');
+
+    stdin.write('\u001B[B');
+    await new Promise((resolve) => setTimeout(resolve, 0));
+    stdin.write('\r');
+    await new Promise((resolve) => setTimeout(resolve, 0));
+
+    expect(lastFrame()).toContain('Theme: Ocean');
+    unmount();
+  });
 });
 
 describe('cli themes', () => {
