@@ -9,7 +9,8 @@ import { startLostfastBackend, type LostfastBackendHandle } from './backend/serv
 import { App } from './cli/App.js';
 import { renderBannerArt } from './cli/ascii.js';
 import { COMMANDS, parseCommand } from './cli/commands.js';
-import { getTheme, themeGradient, themeNames } from './cli/theme.js';
+import { getTheme, themeGradient, themeNames, type ThemeName } from './cli/theme.js';
+import { loadPreferences, saveTheme } from './cli/preferences.js';
 import { loadConfig } from './config.js';
 
 /** Read this package's version, walking up from the module location. */
@@ -48,6 +49,9 @@ async function runHeadless(command: string): Promise<number> {
     if (args[0] && theme.name !== args[0].toLowerCase()) {
       process.stderr.write(`Unknown theme "${args[0]}". Available: ${themeNames().join(', ')}\n`);
       return 1;
+    }
+    if (args[0]) {
+      await saveTheme(theme.name as ThemeName);
     }
     process.stdout.write(args[0] ? `Theme: ${theme.label}\n` : `Themes: ${themeNames().join(', ')}\n`);
     return 0;
@@ -114,7 +118,10 @@ async function main(): Promise<void> {
     return;
   }
 
-  const config = loadConfig();
+  const saved = await loadPreferences();
+  const baseConfig = loadConfig();
+  const effectiveTheme = saved.theme ?? baseConfig.theme;
+  const config = loadConfig({ theme: effectiveTheme });
   const app = await Lostfast.create(config);
   const backend = config.apiEnabled
     ? await startLostfastBackend(app, { host: config.apiHost, port: config.apiPort })

@@ -1,4 +1,4 @@
-import { Box, Static, Text, useApp, useInput } from 'ink';
+import { Box, Text, useApp, useInput } from 'ink';
 import Spinner from 'ink-spinner';
 import TextInput from 'ink-text-input';
 import React, { useCallback, useRef, useState } from 'react';
@@ -7,6 +7,7 @@ import type { Lostfast } from '../app/lostfast.js';
 import type { ProgressEvent } from '../pipeline/collector.js';
 import { COMMANDS, completeCommand, parseCommand, suggestCommands, type CommandSpec } from './commands.js';
 import { OutputLine, type OutputItem } from './output.js';
+import { saveTheme } from './preferences.js';
 import { getTheme, themeNames, type CliTheme, type ThemeName } from './theme.js';
 
 export interface AppProps {
@@ -95,6 +96,7 @@ export function App({ app, version, apiUrl }: AppProps): React.ReactElement {
       const next = getTheme(name);
       setTheme(next);
       setThemeSelectorOpen(false);
+      void saveTheme(next.name as ThemeName);
       push({ kind: 'text', text: `Theme: ${next.label}`, color: next.colors.info });
     },
     [push],
@@ -155,6 +157,7 @@ export function App({ app, version, apiUrl }: AppProps): React.ReactElement {
           return;
         }
         setTheme(next);
+        void saveTheme(next.name as ThemeName);
         push({ kind: 'text', text: `Theme: ${next.label}`, color: next.colors.info });
         return;
       }
@@ -206,7 +209,9 @@ export function App({ app, version, apiUrl }: AppProps): React.ReactElement {
 
   return (
     <Box flexDirection="column">
-      <Static items={history}>{(item) => <OutputLine key={item.id} item={item} theme={theme} apiUrl={apiUrl} />}</Static>
+      {history.map((item) => (
+        <OutputLine key={item.id} item={item} theme={theme} apiUrl={apiUrl} />
+      ))}
 
       {busy ? (
         <Box>
