@@ -81,7 +81,7 @@ LOSTFAST_MARKET_SOURCE=synthetic LOSTFAST_DATA_DIR=:memory: node dist/index.js s
 | `/clear`       | Prune outdated runs, keeping the latest run and the general search table.    |
 | `/status`      | Show per-table row counts and the latest run's analytics.                    |
 | `/strategies`  | List every available strategy.                                               |
-| `/theme [name]`| List or switch themes (`violet`, `ocean`, `ember`, `forest`, `mono`).        |
+| `/theme [name]`| Open the selector window, or switch directly by name (`violet`, `ocean`, `ember`, `forest`, `mono`). |
 | `/api`         | Show the in-process GraphQL endpoint.                                        |
 | `/help`        | Show the command list.                                                       |
 | `/exit`        | Quit (aliases: `/quit`, `/q`, `Esc`, `Ctrl+C`).                              |
@@ -91,7 +91,8 @@ The leading slash is optional. The "general search results" table
 accumulates discoveries across every session, exactly as required.
 
 While typing a command, Lostfast shows matching command suggestions. Press
-`Tab` to complete an unambiguous command prefix.
+`Tab` to complete an unambiguous command prefix. Run `/theme` to open the theme
+selector window, or pass a theme name for one-shot switching.
 
 ![LØSTFΛST autocomplete](docs/screenshots/cli-autocomplete.png)
 

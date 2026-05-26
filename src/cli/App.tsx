@@ -7,12 +7,47 @@ import type { Lostfast } from '../app/lostfast.js';
 import type { ProgressEvent } from '../pipeline/collector.js';
 import { COMMANDS, completeCommand, parseCommand, suggestCommands, type CommandSpec } from './commands.js';
 import { OutputLine, type OutputItem } from './output.js';
-import { getTheme, themeNames } from './theme.js';
+import { getTheme, themeNames, type CliTheme, type ThemeName } from './theme.js';
 
 export interface AppProps {
   app: Lostfast;
   version: string;
   apiUrl?: string;
+}
+
+function ThemeSelector({
+  theme,
+  selectedIndex,
+}: {
+  theme: CliTheme;
+  selectedIndex: number;
+}): React.ReactElement {
+  return (
+    <Box
+      flexDirection="column"
+      borderStyle="round"
+      borderColor={theme.colors.border}
+      paddingX={1}
+      marginTop={1}
+    >
+      <Text bold color={theme.colors.accent}>
+        Select theme
+      </Text>
+      {themeNames().map((name, index) => {
+        const option = getTheme(name);
+        const selected = index === selectedIndex;
+        const current = option.name === theme.name;
+
+        return (
+          <Text key={name} color={selected ? theme.colors.info : undefined}>
+            {selected ? '> ' : '  '}
+            <Text bold={selected}>{option.label.padEnd(8)}</Text>
+            {current ? <Text color={theme.colors.muted}> current</Text> : null}
+          </Text>
+        );
+      })}
+    </Box>
+  );
 }
 
 /**
@@ -28,6 +63,8 @@ export function App({ app, version, apiUrl }: AppProps): React.ReactElement {
   ]);
   const [value, setValue] = useState('');
   const [suggestions, setSuggestions] = useState<CommandSpec[]>([]);
+  const [themeSelectorOpen, setThemeSelectorOpen] = useState(false);
+  const [selectedThemeIndex, setSelectedThemeIndex] = useState(0);
   const [busy, setBusy] = useState(false);
   const [progress, setProgress] = useState<ProgressEvent | null>(null);
   const nextId = useRef(1);
@@ -47,7 +84,36 @@ export function App({ app, version, apiUrl }: AppProps): React.ReactElement {
     setSuggestions(suggestCommands(next).slice(0, 5));
   }, []);
 
+  const openThemeSelector = useCallback(() => {
+    const currentIndex = themeNames().findIndex((name) => name === theme.name);
+    setSelectedThemeIndex(currentIndex >= 0 ? currentIndex : 0);
+    setThemeSelectorOpen(true);
+  }, [theme.name]);
+
+  const applyTheme = useCallback(
+    (name: ThemeName) => {
+      const next = getTheme(name);
+      setTheme(next);
+      setThemeSelectorOpen(false);
+      push({ kind: 'text', text: `Theme: ${next.label}`, color: next.colors.info });
+    },
+    [push],
+  );
+
   useInput((_input, key) => {
+    if (themeSelectorOpen && !busy) {
+      if (key.escape) {
+        setThemeSelectorOpen(false);
+      } else if (key.upArrow) {
+        setSelectedThemeIndex((index) => (index - 1 + themeNames().length) % themeNames().length);
+      } else if (key.downArrow) {
+        setSelectedThemeIndex((index) => (index + 1) % themeNames().length);
+      } else if (key.return) {
+        applyTheme(themeNames()[selectedThemeIndex]);
+      }
+      return;
+    }
+
     if (key.escape && !busy) void quit();
     if (key.tab && !busy) {
       const completed = completeCommand(value);
@@ -80,7 +146,7 @@ export function App({ app, version, apiUrl }: AppProps): React.ReactElement {
       }
       if (name === 'theme') {
         if (args.length === 0) {
-          push({ kind: 'text', text: `Themes: ${themeNames().join(', ')}`, color: theme.colors.info });
+          openThemeSelector();
           return;
         }
         const next = getTheme(args[0]);
@@ -125,7 +191,7 @@ export function App({ app, version, apiUrl }: AppProps): React.ReactElement {
         setProgress(null);
       }
     },
-    [apiUrl, app, push, quit, theme],
+    [apiUrl, app, openThemeSelector, push, quit, theme],
   );
 
   const onSubmit = useCallback(
@@ -151,25 +217,31 @@ export function App({ app, version, apiUrl }: AppProps): React.ReactElement {
         </Box>
       ) : (
         <Box flexDirection="column">
-          <Box>
-            <Text color={theme.colors.accent}>{'> '}</Text>
-            <TextInput
-              value={value}
-              onChange={changeValue}
-              onSubmit={onSubmit}
-              placeholder="type a command, e.g. /start  (/help for all)"
-            />
-          </Box>
-          {suggestions.length > 0 ? (
-            <Box flexDirection="column" marginLeft={2}>
-              {suggestions.map((command) => (
-                <Text key={command.name}>
-                  <Text color={theme.colors.info}>{command.name.padEnd(12)}</Text>
-                  <Text color={theme.colors.muted}>{command.summary}</Text>
-                </Text>
-              ))}
-            </Box>
-          ) : null}
+          {themeSelectorOpen ? (
+            <ThemeSelector theme={theme} selectedIndex={selectedThemeIndex} />
+          ) : (
+            <>
+              <Box>
+                <Text color={theme.colors.accent}>{'> '}</Text>
+                <TextInput
+                  value={value}
+                  onChange={changeValue}
+                  onSubmit={onSubmit}
+                  placeholder="type a command, e.g. /start  (/help for all)"
+                />
+              </Box>
+              {suggestions.length > 0 ? (
+                <Box flexDirection="column" marginLeft={2}>
+                  {suggestions.map((command) => (
+                    <Text key={command.name}>
+                      <Text color={theme.colors.info}>{command.name.padEnd(12)}</Text>
+                      <Text color={theme.colors.muted}>{command.summary}</Text>
+                    </Text>
+                  ))}
+                </Box>
+              ) : null}
+            </>
+          )}
         </Box>
       )}
     </Box>

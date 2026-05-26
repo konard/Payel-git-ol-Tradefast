@@ -10,7 +10,7 @@ export const COMMANDS: CommandSpec[] = [
   { name: '/clear', summary: 'Prune outdated runs (the general search table is preserved)' },
   { name: '/status', summary: 'Show table counts and the latest run analytics' },
   { name: '/strategies', summary: 'List every available strategy' },
-  { name: '/theme', summary: 'List or switch CLI colour themes' },
+  { name: '/theme', summary: 'Open the theme selector or switch CLI colour themes' },
   { name: '/api', summary: 'Show the in-process GraphQL API endpoint' },
   { name: '/help', summary: 'Show this help' },
   { name: '/exit', summary: 'Quit Lostfast (aliases: /quit, Ctrl+C)' },
