@@ -2,6 +2,8 @@ import { and, desc, eq, lt, sql } from 'drizzle-orm';
 
 import type { Candle } from '../domain/candle.js';
 import type { NewsItem } from '../services/news-crawler.js';
+import type { InstrumentConsensus } from '../services/news-consensus.js';
+import { newsConsensus } from './schema.js';
 import type { LostfastDb } from './client.js';
 import {
   aiInsights,
@@ -296,10 +298,69 @@ export class LostfastStore {
     return existing ? 'updated' : 'inserted';
   }
 
+  // --- News crowd consensus (ephemeral, rebuilt from news on start/update) --
+
+  async replaceNewsConsensus(rows: InstrumentConsensus[]): Promise<void> {
+    await this.db.delete(newsConsensus);
+    if (rows.length === 0) return;
+
+    await this.db.insert(newsConsensus).values(
+      rows.map((r) => ({
+        instrument: r.instrument,
+        mentions: r.mentions,
+        bullish: r.bullish,
+        bearish: r.bearish,
+        neutral: r.neutral,
+        crowdBias: r.crowdBias,
+      })),
+    );
+  }
+
+  async getNewsConsensus(limit = 80): Promise<InstrumentConsensus[]> {
+    const rows = await this.db
+      .select()
+      .from(newsConsensus)
+      .orderBy(desc(newsConsensus.crowdBias))
+      .limit(limit);
+    return rows.map((r) => ({
+      instrument: r.instrument,
+      mentions: r.mentions,
+      bullish: r.bullish,
+      bearish: r.bearish,
+      neutral: r.neutral,
+      crowdBias: r.crowdBias,
+    }));
+  }
+
+  async clearNewsConsensus(): Promise<number> {
+    const result = await this.db.delete(newsConsensus);
+    return result.rowCount ?? 0;
+  }
+
+  async getRecentNewsItems(limit = 5000): Promise<import('../services/news-crawler.js').NewsItem[]> {
+    const rows = await this.db
+      .select()
+      .from(newsItems)
+      .orderBy(desc(newsItems.fetchedAt))
+      .limit(limit);
+    return rows.map((r) => ({
+      sourceId: r.sourceId,
+      sourceTitle: r.sourceTitle,
+      sourceUrl: r.sourceUrl,
+      kind: r.kind as any,
+      title: r.title,
+      url: r.url ?? undefined,
+      summary: r.summary ?? undefined,
+      publishedAt: r.publishedAt?.toISOString(),
+      fetchedAt: r.fetchedAt.toISOString(),
+      contentHash: r.contentHash,
+    }));
+  }
+
   // --- Read helpers for the UI --------------------------------------------
 
   async tableCounts(): Promise<Record<string, number>> {
-    const tables = { runs, candles: candlesTable, signals, analytics, scrapes, aiInsights, searchResults, newsItems };
+    const tables = { runs, candles: candlesTable, signals, analytics, scrapes, aiInsights, searchResults, newsItems, newsConsensus };
     const entries = await Promise.all(
       Object.entries(tables).map(async ([name, table]) => {
         const [row] = await this.db.select({ count: sql<number>`count(*)::int` }).from(table);

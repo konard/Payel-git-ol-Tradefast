@@ -88,6 +88,7 @@ function NewsView({ report, theme }: { report: PersistedNewsCrawlReport; theme: 
 }
 
 function StatusView({ status, theme }: { status: StatusReport; theme: CliTheme }): React.ReactElement {
+  const crowd = status.crowdConsensus ?? [];
   return (
     <Box flexDirection="column" marginY={1}>
       <Text bold color={theme.colors.accent}>
@@ -105,6 +106,29 @@ function StatusView({ status, theme }: { status: StatusReport; theme: CliTheme }
           {a.shortCount})
         </Text>
       ))}
+
+      {crowd.length > 0 && (
+        <Box flexDirection="column" marginTop={1}>
+          <Text bold color={theme.colors.accent}>
+            ▌News Crowd Consensus ({crowd.length} instruments — forex • macro • crypto • everything the crawler found)
+          </Text>
+          {crowd.slice(0, 25).map((c, idx) => {
+            const dir = c.crowdBias > 0.15 ? 'bullish' : c.crowdBias < -0.15 ? 'bearish' : 'neutral';
+            const color = dir === 'bullish' ? theme.colors.long : dir === 'bearish' ? theme.colors.short : theme.colors.muted;
+            return (
+              <Text key={idx}>
+                {'  '}
+                <Text bold>{c.instrument.padEnd(12)}</Text>{' '}
+                <Text color={color}>{dir.padEnd(8)}</Text>
+                bias {c.crowdBias.toFixed(2)} ({c.mentions} mentions: +{c.bullish} -{c.bearish})
+              </Text>
+            );
+          })}
+          {crowd.length > 25 && (
+            <Text color={theme.colors.muted}>  ... +{crowd.length - 25} more instruments in the full crowd table</Text>
+          )}
+        </Box>
+      )}
     </Box>
   );
 }

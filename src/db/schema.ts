@@ -173,5 +173,29 @@ export const newsItems = pgTable(
   }),
 );
 
+/**
+ * Crowd / news-driven consensus per instrument.
+ * Built from the persistent news_items. Cleared on every `/start` so that the
+ * "big table" of what the crawler found + what the crowd thinks is fresh.
+ * Covers crypto + forex + macro events + commodities + indices.
+ */
+export const newsConsensus = pgTable(
+  'news_consensus',
+  {
+    id: serial('id').primaryKey(),
+    instrument: varchar('instrument', { length: 50 }).notNull(), // e.g. 'EUR/USD', 'USD', 'Gold', 'NFP', 'BTC'
+    mentions: integer('mentions').notNull().default(0),
+    bullish: integer('bullish').notNull().default(0),
+    bearish: integer('bearish').notNull().default(0),
+    neutral: integer('neutral').notNull().default(0),
+    crowdBias: real('crowd_bias').notNull(), // -1.0 (very bearish) ... +1.0 (very bullish)
+    lastUpdated: timestamp('last_updated', { withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => ({
+    uniq: uniqueIndex('news_consensus_instrument_uq').on(t.instrument),
+    byBias: index('news_consensus_bias_idx').on(t.crowdBias),
+  }),
+);
+
 /** Tables that `/start` wipes and `/clear` prunes. The general tables are excluded. */
-export const EPHEMERAL_TABLES = [signals, analytics, scrapes, aiInsights, candles, runs] as const;
+export const EPHEMERAL_TABLES = [signals, analytics, scrapes, aiInsights, candles, runs, newsConsensus] as const;

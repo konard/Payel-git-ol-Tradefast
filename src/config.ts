@@ -12,7 +12,12 @@ export interface LostfastConfig {
   apiPort: number;
 }
 
-const DEFAULT_SYMBOLS = ['BTCUSDT', 'ETHUSDT', 'SOLUSDT'];
+const DEFAULT_SYMBOLS = [
+  'BTCUSDT', 'ETHUSDT', 'SOLUSDT', 'XRPUSDT', 'ADAUSDT',
+  'DOGEUSDT', 'BNBUSDT', 'AVAXUSDT', 'DOTUSDT', 'LINKUSDT',
+  'LTCUSDT', 'NEARUSDT', 'APTUSDT', 'ARBUSDT', 'SUIUSDT',
+  'TONUSDT', 'PEPEUSDT'
+];
 
 function envFlag(name: string, fallback: boolean): boolean {
   const value = process.env[name];

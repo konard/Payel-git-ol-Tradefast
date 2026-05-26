@@ -15,6 +15,13 @@
       "when": 1779794933154,
       "tag": "0001_certain_callisto",
       "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "7",
+      "when": 1779805757809,
+      "tag": "0002_reflective_gargoyle",
+      "breakpoints": true
     }
   ]
 }
