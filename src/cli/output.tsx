@@ -6,6 +6,8 @@ import type { RunReport } from '../pipeline/collector.js';
 import type { BacktestReport } from '../services/backtest.js';
 import { Banner } from './Banner.js';
 import { renderBacktestParts } from './backtest-log.js';
+import type { ChartData } from './chart.js';
+import { CandleChartView } from './chart.js';
 import { directionColor, type CliTheme } from './theme.js';
 import { renderTradeLogParts } from './trade-log.js';
 
@@ -19,7 +21,8 @@ export type OutputItem =
   | { id: number; kind: 'backtest'; report: BacktestReport }
   | { id: number; kind: 'news'; report: PersistedNewsCrawlReport }
   | { id: number; kind: 'status'; status: StatusReport }
-  | { id: number; kind: 'strategies'; list: { id: string; title: string }[] };
+  | { id: number; kind: 'strategies'; list: { id: string; title: string }[] }
+  | { id: number; kind: 'chart'; data: ChartData };
 
 function RunView({ report, theme }: { report: RunReport; theme: CliTheme }): React.ReactElement {
   const parts = renderTradeLogParts(report);
@@ -236,5 +239,7 @@ export function OutputLine({
       return <StatusView status={item.status} theme={theme} />;
     case 'strategies':
       return <StrategiesView list={item.list} theme={theme} />;
+    case 'chart':
+      return <CandleChartView data={item.data} theme={theme} />;
   }
 }

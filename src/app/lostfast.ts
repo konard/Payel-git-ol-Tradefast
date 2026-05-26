@@ -2,6 +2,7 @@ import { createDb, type DbHandle } from '../db/client.js';
 import { LostfastStore } from '../db/store.js';
 import type { AnalyticsRow } from '../db/store.js';
 import { loadConfig, type LostfastConfig } from '../config.js';
+import type { Candle } from '../domain/candle.js';
 import { CollectionPipeline, type ProgressListener, type RunReport } from '../pipeline/collector.js';
 import {
   aggregateBacktests,
@@ -17,7 +18,7 @@ import {
   type NewsProgressListener,
 } from '../services/news-crawler.js';
 import { ALL_STRATEGIES } from '../strategies/registry.js';
-import { computeCrowdConsensus } from '../services/news-consensus.js';
+import { computeCrowdConsensus, type InstrumentConsensus } from '../services/news-consensus.js';
 
 export interface StatusReport {
   driver: string;
@@ -25,6 +26,14 @@ export interface StatusReport {
   latestRunId?: number;
   latestAnalytics: AnalyticsRow[];
   crowdConsensus?: import('../services/news-consensus.js').InstrumentConsensus[];
+}
+
+export interface CurrencyForecast {
+  symbol: string;
+  report: RunReport;
+  price: number | null;
+  newsConsensus: InstrumentConsensus[];
+  candles: Candle[];
 }
 
 export interface PersistedNewsCrawlReport extends NewsCrawlReport {
@@ -144,6 +153,40 @@ export class Lostfast {
     }
 
     return aggregateBacktests(results);
+  }
+
+  /** `/currency` — run a full forecast for a single symbol, including news consensus. */
+  async forecastCurrency(symbol: string, onProgress?: ProgressListener): Promise<CurrencyForecast> {
+    const report = await this.pipeline.collect(
+      'update',
+      {
+        symbols: [symbol],
+        interval: this.config.interval,
+        limit: this.config.candleLimit,
+        accountBalance: this.config.accountBalance,
+      },
+      onProgress,
+    );
+
+    const lastAnalysis = report.symbols[0]?.analysis.analytics;
+    const price = lastAnalysis?.lastPrice ?? null;
+
+    const baseAsset = symbol.replace(/USDT$/, '').replace(/USD$/, '').replace(/BTC$/, '').replace(/ETH$/, '');
+    const allConsensus = await this.store.getNewsConsensus(200);
+    const currencyNews = allConsensus.filter(
+      (c) =>
+        c.instrument.toUpperCase() === baseAsset.toUpperCase() ||
+        c.instrument.toUpperCase() === symbol.toUpperCase(),
+    );
+
+    const candles = await this.store.getCandles(symbol, this.config.interval);
+
+    return { symbol, report, price, newsConsensus: currencyNews, candles };
+  }
+
+  /** Read back persisted candles for chart rendering. */
+  getCandles(symbol: string, interval: string): Promise<Candle[]> {
+    return this.store.getCandles(symbol, interval);
   }
 
   /** `/clear` — prune outdated runs; the general search table is preserved. */

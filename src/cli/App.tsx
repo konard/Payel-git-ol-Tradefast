@@ -126,6 +126,40 @@ function IntervalSelector({
   );
 }
 
+function CurrencySelector({
+  theme,
+  selectedIndex,
+  symbols,
+}: {
+  theme: CliTheme;
+  selectedIndex: number;
+  symbols: string[];
+}): React.ReactElement {
+  return (
+    <Box
+      flexDirection="column"
+      borderStyle="round"
+      borderColor={theme.colors.border}
+      paddingX={1}
+      marginTop={1}
+    >
+      <Text bold color={theme.colors.accent}>
+        Select currency for detailed forecast
+      </Text>
+      {symbols.map((symbol, index) => {
+        const selected = index === selectedIndex;
+        return (
+          <Text key={symbol} color={selected ? theme.colors.info : undefined}>
+            {selected ? '> ' : '  '}
+            <Text bold={selected}>{symbol.padEnd(10)}</Text>
+            {selected ? <Text color={theme.colors.muted}> press Enter to analyse</Text> : null}
+          </Text>
+        );
+      })}
+    </Box>
+  );
+}
+
 /**
  * The interactive shell. A static banner and transcript scroll above a single
  * input line — the same layout as the Gemini CLI. All side effects go through
@@ -148,6 +182,8 @@ export function App({ app, version, apiUrl }: AppProps): React.ReactElement {
   const [intervalSelectorOpen, setIntervalSelectorOpen] = useState(false);
   const [selectedIntervalIndex, setSelectedIntervalIndex] = useState(0);
   const [interval, setInterval] = useState<IntervalName>(() => getInterval(app.config.interval).name as IntervalName);
+  const [currencySelectorOpen, setCurrencySelectorOpen] = useState(false);
+  const [selectedCurrencyIndex, setSelectedCurrencyIndex] = useState(0);
   const [busy, setBusy] = useState(false);
   const [progress, setProgress] = useState<{ message: string; step: number; totalSteps: number } | null>(null);
   const nextId = useRef(1);
@@ -186,6 +222,11 @@ export function App({ app, version, apiUrl }: AppProps): React.ReactElement {
     setIntervalSelectorOpen(true);
   }, [interval]);
 
+  const openCurrencySelector = useCallback(() => {
+    setSelectedCurrencyIndex(0);
+    setCurrencySelectorOpen(true);
+  }, []);
+
   const applyTheme = useCallback(
     (name: ThemeName) => {
       const next = getTheme(name);
@@ -217,6 +258,45 @@ export function App({ app, version, apiUrl }: AppProps): React.ReactElement {
       void saveInterval(next.name as IntervalName);
       app.setInterval(next.name);
       push({ kind: 'text', text: `Trading timeframe: ${next.label}`, color: theme.colors.info });
+    },
+    [app, push, theme],
+  );
+
+  const applyCurrency = useCallback(
+    (symbol: string) => {
+      setCurrencySelectorOpen(false);
+      setBusy(true);
+      void (async () => {
+        try {
+          const forecast = await app.forecastCurrency(symbol, (e) => setProgress(e));
+          push({ kind: 'run', report: forecast.report });
+          push({ kind: 'chart', data: { symbol, interval: app.config.interval, candles: forecast.candles } });
+
+          if (forecast.price != null) {
+            push({
+              kind: 'text',
+              text: `${symbol} last price: ${forecast.price}`,
+              color: theme.colors.info,
+            });
+          }
+
+          const news = forecast.newsConsensus;
+          if (news.length > 0) {
+            const top = news[0];
+            const dir = top.crowdBias > 0.15 ? 'bullish' : top.crowdBias < -0.15 ? 'bearish' : 'neutral';
+            push({
+              kind: 'text',
+              text: `News sentiment for ${top.instrument}: ${dir} (bias ${top.crowdBias.toFixed(2)}, ${top.mentions} mentions)`,
+              color: theme.colors.muted,
+            });
+          }
+        } catch (error) {
+          push({ kind: 'error', text: error instanceof Error ? error.message : String(error) });
+        } finally {
+          setBusy(false);
+          setProgress(null);
+        }
+      })();
     },
     [app, push, theme],
   );
@@ -257,6 +337,19 @@ export function App({ app, version, apiUrl }: AppProps): React.ReactElement {
         setSelectedIntervalIndex((index) => (index + 1) % intervalNames().length);
       } else if (key.return) {
         applyInterval(intervalNames()[selectedIntervalIndex]);
+      }
+      return;
+    }
+
+    if (currencySelectorOpen && !busy) {
+      if (key.escape) {
+        setCurrencySelectorOpen(false);
+      } else if (key.upArrow) {
+        setSelectedCurrencyIndex((index) => (index - 1 + app.config.symbols.length) % app.config.symbols.length);
+      } else if (key.downArrow) {
+        setSelectedCurrencyIndex((index) => (index + 1) % app.config.symbols.length);
+      } else if (key.return) {
+        applyCurrency(app.config.symbols[selectedCurrencyIndex]);
       }
       return;
     }
@@ -357,6 +450,45 @@ export function App({ app, version, apiUrl }: AppProps): React.ReactElement {
         push({ kind: 'strategies', list: app.strategies() });
         return;
       }
+      if (name === 'currency') {
+        if (args.length === 0) {
+          openCurrencySelector();
+          return;
+        }
+        const symbol = args[0].toUpperCase();
+        if (!app.config.symbols.includes(symbol)) {
+          push({
+            kind: 'error',
+            text: `Unknown currency "${symbol}". Available: ${app.config.symbols.join(', ')}`,
+          });
+          return;
+        }
+        setBusy(true);
+        try {
+          const forecast = await app.forecastCurrency(symbol, (e) => setProgress(e));
+          push({ kind: 'run', report: forecast.report });
+          push({ kind: 'chart', data: { symbol, interval: app.config.interval, candles: forecast.candles } });
+          if (forecast.price != null) {
+            push({ kind: 'text', text: `${symbol} last price: ${forecast.price}`, color: theme.colors.info });
+          }
+          const news = forecast.newsConsensus;
+          if (news.length > 0) {
+            const top = news[0];
+            const dir = top.crowdBias > 0.15 ? 'bullish' : top.crowdBias < -0.15 ? 'bearish' : 'neutral';
+            push({
+              kind: 'text',
+              text: `News sentiment for ${top.instrument}: ${dir} (bias ${top.crowdBias.toFixed(2)}, ${top.mentions} mentions)`,
+              color: theme.colors.muted,
+            });
+          }
+        } catch (error) {
+          push({ kind: 'error', text: error instanceof Error ? error.message : String(error) });
+        } finally {
+          setBusy(false);
+          setProgress(null);
+        }
+        return;
+      }
       if (name === 'unknown') {
         push({ kind: 'error', text: `Unknown command "${raw}". Type /help.` });
         return;
@@ -390,7 +522,7 @@ export function App({ app, version, apiUrl }: AppProps): React.ReactElement {
         setProgress(null);
       }
     },
-    [apiUrl, app, openThemeSelector, openExchangeSelector, openIntervalSelector, push, quit, theme],
+    [apiUrl, app, openThemeSelector, openExchangeSelector, openIntervalSelector, openCurrencySelector, push, quit, theme],
   );
 
   const onSubmit = useCallback(
@@ -429,6 +561,8 @@ export function App({ app, version, apiUrl }: AppProps): React.ReactElement {
             <ExchangeSelector theme={theme} selectedIndex={selectedExchangeIndex} current={exchange} />
           ) : intervalSelectorOpen ? (
             <IntervalSelector theme={theme} selectedIndex={selectedIntervalIndex} current={interval} />
+          ) : currencySelectorOpen ? (
+            <CurrencySelector theme={theme} selectedIndex={selectedCurrencyIndex} symbols={app.config.symbols} />
           ) : (
             <>
               <Box>
