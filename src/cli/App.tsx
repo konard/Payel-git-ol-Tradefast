@@ -101,6 +101,7 @@ export function App({ app, version, apiUrl }: AppProps): React.ReactElement {
   ]);
   const [value, setValue] = useState('');
   const [suggestions, setSuggestions] = useState<CommandSpec[]>([]);
+  const [selectedSuggestionIndex, setSelectedSuggestionIndex] = useState(0);
   const [themeSelectorOpen, setThemeSelectorOpen] = useState(false);
   const [selectedThemeIndex, setSelectedThemeIndex] = useState(0);
   const [exchangeSelectorOpen, setExchangeSelectorOpen] = useState(false);
@@ -123,6 +124,7 @@ export function App({ app, version, apiUrl }: AppProps): React.ReactElement {
   const changeValue = useCallback((next: string) => {
     setValue(next);
     setSuggestions(suggestCommands(next).slice(0, 5));
+    setSelectedSuggestionIndex(0);
   }, []);
 
   const openThemeSelector = useCallback(() => {
@@ -185,6 +187,21 @@ export function App({ app, version, apiUrl }: AppProps): React.ReactElement {
         applyExchange(exchangeNames()[selectedExchangeIndex]);
       }
       return;
+    }
+
+    if (suggestions.length > 0 && !busy) {
+      if (key.upArrow) {
+        setSelectedSuggestionIndex((i) => (i - 1 + suggestions.length) % suggestions.length);
+        return;
+      }
+      if (key.downArrow) {
+        setSelectedSuggestionIndex((i) => (i + 1) % suggestions.length);
+        return;
+      }
+      if (key.escape) {
+        setSuggestions([]);
+        return;
+      }
     }
 
     if (key.escape && !busy) void quit();
@@ -288,12 +305,17 @@ export function App({ app, version, apiUrl }: AppProps): React.ReactElement {
 
   const onSubmit = useCallback(
     (raw: string) => {
+      if (suggestions.length > 0) {
+        setValue(suggestions[selectedSuggestionIndex].name);
+        setSuggestions([]);
+        return;
+      }
       const trimmed = raw.trim();
       setValue('');
       setSuggestions([]);
       if (trimmed.length > 0 && !busy) void run(trimmed);
     },
-    [busy, run],
+    [suggestions, selectedSuggestionIndex, busy, run],
   );
 
   return (
@@ -328,9 +350,17 @@ export function App({ app, version, apiUrl }: AppProps): React.ReactElement {
               </Box>
               {suggestions.length > 0 ? (
                 <Box flexDirection="column" marginLeft={2}>
-                  {suggestions.map((command) => (
+                  {suggestions.map((command, index) => (
                     <Text key={command.name}>
-                      <Text color={theme.colors.info}>{command.name.padEnd(12)}</Text>
+                      <Text color={theme.colors.accent}>
+                        {index === selectedSuggestionIndex ? '> ' : '  '}
+                      </Text>
+                      <Text
+                        bold={index === selectedSuggestionIndex}
+                        color={theme.colors.info}
+                      >
+                        {command.name.padEnd(12)}
+                      </Text>
                       <Text color={theme.colors.muted}>{command.summary}</Text>
                     </Text>
                   ))}
