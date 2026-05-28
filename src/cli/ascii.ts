@@ -1,20 +1,5 @@
 import figlet from 'figlet';
 
-/**
- * Custom Ø glyph: the ANSI-Shadow "O" with a clean diagonal stroke
- * (lower-left → upper-right). figlet has no glyph for Ø, so we supply one that
- * matches the font's weight and shadow convention.
- */
-const O_SLASH = [
-  ' ██████╗ ',
-  '██╔══███╗',
-  '██║ █ ██║',
-  '██║█  ██║',
-  '╚██████╔╝',
-  ' ╚═════╝ ',
-  '         ',
-];
-
 /** Custom Λ glyph: a pointed apex with legs spreading outward, matching the font. */
 const LAMBDA = [
   '  ██╗   ',
@@ -28,8 +13,8 @@ const LAMBDA = [
 
 const BANNER_ROWS = 7;
 type Glyph = string | string[];
-/** L Ø S T F Λ S T — the two stylised letters use the custom glyphs above. */
-const WORDMARK: Glyph[] = ['L', O_SLASH, 'S', 'T', 'F', LAMBDA, 'S', 'T'];
+/** T R A D E F Λ S T — the stylised Λ uses the custom glyph above. */
+const WORDMARK: Glyph[] = ['T', 'R', 'A', 'D', 'E', 'F', LAMBDA, 'S', 'T'];
 
 const glyphLines = (g: Glyph): string[] =>
   Array.isArray(g) ? g : figlet.textSync(g, { font: 'ANSI Shadow' }).split('\n');
