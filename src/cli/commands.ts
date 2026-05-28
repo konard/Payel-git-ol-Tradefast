@@ -18,6 +18,7 @@ export const COMMANDS: CommandSpec[] = [
   { name: '/operating-mode-time', summary: 'Select trading timeframe (1m, 5m, 10m, 15m, 20m, 30m, 1h, 4h, 1d)' },
   { name: '/serching-platforms', summary: 'Choose which research platforms to crawl (news portals, Reddit, exchanges, calendars)' },
   { name: '/serching-level', summary: 'Set research depth: Normal (fast), High (deep), Max (full graph)' },
+  { name: '/ratings', summary: 'Show source credibility ratings and adjust with correct/incorrect/loud-claim subcommands' },
   { name: '/api', summary: 'Show the in-process GraphQL API endpoint' },
   { name: '/help', summary: 'Show this help' },
   { name: '/currency', summary: 'Select a specific currency for detailed forecast, news, and rate analysis' },
@@ -38,6 +39,7 @@ export type CommandName =
   | 'operating-mode-time'
   | 'serching-platforms'
   | 'serching-level'
+  | 'ratings'
   | 'currency'
   | 'api'
   | 'help'
@@ -68,6 +70,7 @@ export function parseCommand(raw: string): ParsedCommand {
     case 'operating-mode-time':
     case 'serching-platforms':
     case 'serching-level':
+    case 'ratings':
     case 'currency':
     case 'api':
     case 'help':

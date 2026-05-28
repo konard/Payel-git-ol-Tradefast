@@ -19,6 +19,7 @@ import {
 } from '../services/news-crawler.js';
 import { ALL_STRATEGIES } from '../strategies/registry.js';
 import { computeCrowdConsensus, type InstrumentConsensus } from '../services/news-consensus.js';
+import { SourceRatingService } from '../services/source-ratings.js';
 
 export interface StatusReport {
   driver: string;
@@ -67,6 +68,7 @@ export class Lostfast {
     private readonly newsCrawler: NewsCrawler,
     readonly config: LostfastConfig,
     private market: MarketDataSource,
+    readonly ratingService: SourceRatingService,
   ) {}
 
   static async create(config: LostfastConfig = loadConfig()): Promise<Lostfast> {
@@ -75,7 +77,9 @@ export class Lostfast {
     const market = createResilientMarketSourceFor(config.exchange);
     const pipeline = new CollectionPipeline(store, market);
     const newsCrawler = await createNewsCrawler();
-    return new Lostfast(handle, store, pipeline, newsCrawler, config, market);
+    const ratingService = new SourceRatingService(store);
+    await ratingService.seedSources(newsCrawler.sources);
+    return new Lostfast(handle, store, pipeline, newsCrawler, config, market, ratingService);
   }
 
   /** Updates the exchange used for market data on subsequent /start and /update.
@@ -246,6 +250,18 @@ export class Lostfast {
 
   async clearNewsConsensus(): Promise<number> {
     return this.store.clearNewsConsensus();
+  }
+
+  async ratings(): Promise<import('../services/source-ratings.js').SourceRating[]> {
+    return this.ratingService.getAllRatings();
+  }
+
+  async recordPrediction(sourceId: string, outcome: 'correct' | 'incorrect'): Promise<import('../services/source-ratings.js').SourceRating | undefined> {
+    return this.ratingService.recordPrediction(sourceId, outcome);
+  }
+
+  async recordLoudClaim(sourceId: string): Promise<import('../services/source-ratings.js').SourceRating | undefined> {
+    return this.ratingService.recordLoudClaim(sourceId);
   }
 
   close(): Promise<void> {

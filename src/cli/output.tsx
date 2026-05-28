@@ -4,6 +4,7 @@ import React from 'react';
 import type { PersistedNewsCrawlReport, StatusReport } from '../app/lostfast.js';
 import type { RunReport } from '../pipeline/collector.js';
 import type { BacktestReport } from '../services/backtest.js';
+import type { SourceRating } from '../services/source-ratings.js';
 import { Banner } from './Banner.js';
 import { renderBacktestParts } from './backtest-log.js';
 import type { ChartData } from './chart.js';
@@ -23,7 +24,8 @@ export type OutputItem =
   | { id: number; kind: 'status'; status: StatusReport }
   | { id: number; kind: 'strategies'; list: { id: string; title: string }[] }
   | { id: number; kind: 'chart'; data: ChartData }
-  | { id: number; kind: 'ai'; text: string };
+  | { id: number; kind: 'ai'; text: string }
+  | { id: number; kind: 'ratings'; ratings: SourceRating[]; message?: string };
 
 function RunView({ report, theme }: { report: RunReport; theme: CliTheme }): React.ReactElement {
   const parts = renderTradeLogParts(report);
@@ -221,6 +223,47 @@ function StrategiesView({
   );
 }
 
+function RatingsView({ ratings, message, theme }: { ratings: SourceRating[]; message?: string; theme: CliTheme }): React.ReactElement {
+  const byKind = new Map<string, SourceRating[]>();
+  for (const r of ratings) {
+    const list = byKind.get(r.kind) ?? [];
+    list.push(r);
+    byKind.set(r.kind, list);
+  }
+
+  const scoreColor = (s: number): string => {
+    if (s >= 0.9) return theme.colors.info;
+    if (s >= 0.7) return theme.colors.warn;
+    return theme.colors.error;
+  };
+
+  return (
+    <Box flexDirection="column" marginY={1}>
+      <Text bold color={theme.colors.accent}>▌Source ratings</Text>
+      {message && <Text color={theme.colors.muted}>{'  '}{message}</Text>}
+      <Text color={theme.colors.muted}>{'  '}{ratings.length} source(s)</Text>
+      {[...byKind.entries()].map(([kind, sources]) => (
+        <Box key={kind} flexDirection="column">
+          <Text bold color={theme.colors.accent}>{'  '}{kind}</Text>
+          <Box flexDirection="column">
+            {sources.map((r) => (
+              <Text key={r.sourceId} color={theme.colors.muted}>
+                {'    '}
+                <Text color={scoreColor(r.credibilityScore)}>{`${(r.credibilityScore * 100).toFixed(0)}%`.padEnd(5)}</Text>
+                {' '}
+                <Text color={theme.colors.text}>{r.sourceTitle.padEnd(32)}</Text>
+                {' '}
+                <Text>{`✓${r.predictionsCorrect}/${r.predictionsMade}`.padEnd(10)}</Text>
+                {r.loudClaims > 0 && <Text color={theme.colors.error}>{` ⚠${r.loudClaims}`}</Text>}
+              </Text>
+            ))}
+          </Box>
+        </Box>
+      ))}
+    </Box>
+  );
+}
+
 /** Renders one transcript entry. */
 export function OutputLine({
   item,
@@ -264,5 +307,7 @@ export function OutputLine({
           <Text color={theme.colors.muted}>{item.text}</Text>
         </Box>
       );
+    case 'ratings':
+      return <RatingsView ratings={item.ratings} message={item.message} theme={theme} />;
   }
 }

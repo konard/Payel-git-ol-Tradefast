@@ -198,5 +198,30 @@ export const newsConsensus = pgTable(
   }),
 );
 
+/**
+ * Source credibility ratings — tracks how trustworthy each news/research source
+ * has proven to be over time. Sources start at 1.0 and are adjusted as their
+ * predictions are validated or contradicted by actual market movements.
+ */
+export const sourceRatings = pgTable(
+  'source_ratings',
+  {
+    id: serial('id').primaryKey(),
+    sourceId: varchar('source_id', { length: 80 }).notNull(),
+    sourceTitle: text('source_title').notNull(),
+    sourceUrl: text('source_url').notNull(),
+    kind: varchar('kind', { length: 32 }).notNull(),
+    credibilityScore: real('credibility_score').notNull().default(1.0),
+    predictionsMade: integer('predictions_made').notNull().default(0),
+    predictionsCorrect: integer('predictions_correct').notNull().default(0),
+    loudClaims: integer('loud_claims').notNull().default(0),
+    lastPredictionAt: timestamp('last_prediction_at', { withTimezone: true }),
+    lastUpdated: timestamp('last_updated', { withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => ({
+    bySourceId: uniqueIndex('source_ratings_source_id_uq').on(t.sourceId),
+  }),
+);
+
 /** Tables that `/start` wipes and `/clear` prunes. The general tables are excluded. */
 export const EPHEMERAL_TABLES = [signals, analytics, scrapes, aiInsights, candles, runs, newsConsensus] as const;

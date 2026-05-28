@@ -771,6 +771,32 @@ export function App({ app, version, apiUrl, promptOperatingMode }: AppProps): Re
         push({ kind: 'strategies', list: app.strategies() });
         return;
       }
+      if (name === 'ratings') {
+        setBusy(true);
+        try {
+          const ratings = await app.ratings();
+          let message: string | undefined;
+          if (args[0] === 'correct' && args[1]) {
+            const updated = await app.recordPrediction(args[1], 'correct');
+            if (updated) message = `${args[1]}: correct → ${(updated.credibilityScore * 100).toFixed(0)}%`;
+            else push({ kind: 'error', text: `Source "${args[1]}" not found` });
+          } else if (args[0] === 'incorrect' && args[1]) {
+            const updated = await app.recordPrediction(args[1], 'incorrect');
+            if (updated) message = `${args[1]}: incorrect → ${(updated.credibilityScore * 100).toFixed(0)}%`;
+            else push({ kind: 'error', text: `Source "${args[1]}" not found` });
+          } else if ((args[0] === 'loud-claim' || args[0] === 'loud') && args[1]) {
+            const updated = await app.recordLoudClaim(args[1]);
+            if (updated) message = `${args[1]}: loud claim → ${(updated.credibilityScore * 100).toFixed(0)}%`;
+            else push({ kind: 'error', text: `Source "${args[1]}" not found` });
+          }
+          push({ kind: 'ratings', ratings, message });
+        } catch (error) {
+          push({ kind: 'error', text: error instanceof Error ? error.message : String(error) });
+        } finally {
+          setBusy(false);
+        }
+        return;
+      }
       if (name === 'currency') {
         if (args.length === 0) {
           openCurrencySelector();

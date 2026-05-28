@@ -14,6 +14,7 @@ import {
   scrapes,
   searchResults,
   signals,
+  sourceRatings,
 } from './schema.js';
 
 export type RunKind = 'start' | 'update';
@@ -362,7 +363,7 @@ export class LostfastStore {
   // --- Read helpers for the UI --------------------------------------------
 
   async tableCounts(): Promise<Record<string, number>> {
-    const tables = { runs, candles: candlesTable, signals, analytics, scrapes, aiInsights, searchResults, newsItems, newsConsensus };
+    const tables = { runs, candles: candlesTable, signals, analytics, scrapes, aiInsights, searchResults, newsItems, newsConsensus, sourceRatings };
     const entries = await Promise.all(
       Object.entries(tables).map(async ([name, table]) => {
         const [row] = await this.db.select({ count: sql<number>`count(*)::int` }).from(table);
@@ -385,5 +386,98 @@ export class LostfastStore {
       lastPrice: r.lastPrice,
       atr: r.atr,
     }));
+  }
+
+  // --- Source ratings -------------------------------------------------------
+
+  async getSourceRating(sourceId: string): Promise<import('../services/source-ratings.js').SourceRating | undefined> {
+    const [row] = await this.db
+      .select()
+      .from(sourceRatings)
+      .where(eq(sourceRatings.sourceId, sourceId))
+      .limit(1);
+    if (!row) return undefined;
+    return {
+      sourceId: row.sourceId,
+      sourceTitle: row.sourceTitle,
+      sourceUrl: row.sourceUrl,
+      kind: row.kind,
+      credibilityScore: row.credibilityScore,
+      predictionsMade: row.predictionsMade,
+      predictionsCorrect: row.predictionsCorrect,
+      loudClaims: row.loudClaims,
+      lastPredictionAt: row.lastPredictionAt?.toISOString(),
+      lastUpdated: row.lastUpdated.toISOString(),
+    };
+  }
+
+  async getAllSourceRatings(): Promise<import('../services/source-ratings.js').SourceRating[]> {
+    const rows = await this.db
+      .select()
+      .from(sourceRatings)
+      .orderBy(sourceRatings.credibilityScore);
+    return rows.map((r) => ({
+      sourceId: r.sourceId,
+      sourceTitle: r.sourceTitle,
+      sourceUrl: r.sourceUrl,
+      kind: r.kind,
+      credibilityScore: r.credibilityScore,
+      predictionsMade: r.predictionsMade,
+      predictionsCorrect: r.predictionsCorrect,
+      loudClaims: r.loudClaims,
+      lastPredictionAt: r.lastPredictionAt?.toISOString(),
+      lastUpdated: r.lastUpdated.toISOString(),
+    }));
+  }
+
+  async upsertSourceRating(row: {
+    sourceId: string;
+    sourceTitle: string;
+    sourceUrl: string;
+    kind: string;
+    credibilityScore: number;
+    predictionsMade: number;
+    predictionsCorrect: number;
+    loudClaims: number;
+  }): Promise<void> {
+    await this.db
+      .insert(sourceRatings)
+      .values({
+        ...row,
+        lastUpdated: new Date(),
+      })
+      .onConflictDoUpdate({
+        target: sourceRatings.sourceId,
+        set: {
+          sourceTitle: row.sourceTitle,
+          sourceUrl: row.sourceUrl,
+          kind: row.kind,
+          credibilityScore: row.credibilityScore,
+          predictionsMade: row.predictionsMade,
+          predictionsCorrect: row.predictionsCorrect,
+          loudClaims: row.loudClaims,
+          lastUpdated: new Date(),
+        },
+      });
+  }
+
+  async updateSourceRating(
+    sourceId: string,
+    updates: Partial<{
+      credibilityScore: number;
+      predictionsMade: number;
+      predictionsCorrect: number;
+      loudClaims: number;
+      lastPredictionAt: string;
+    }>,
+  ): Promise<void> {
+    await this.db
+      .update(sourceRatings)
+      .set({
+        ...updates,
+        lastPredictionAt: updates.lastPredictionAt ? new Date(updates.lastPredictionAt) : undefined,
+        lastUpdated: new Date(),
+      })
+      .where(eq(sourceRatings.sourceId, sourceId));
   }
 }

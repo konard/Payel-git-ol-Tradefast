@@ -154,7 +154,7 @@ async function detectPlaywrightFetcher(): Promise<NewsPageFetcher> {
 
 export class NewsCrawler {
   constructor(
-    private readonly sources: readonly NewsSource[],
+    readonly sources: readonly NewsSource[],
     private readonly fetcher: NewsPageFetcher,
     private readonly options: NewsCrawlOptions = {},
   ) {}
