@@ -37,6 +37,9 @@ interactive terminal UI.
   trusted blindly.
 - **News crawler**: Playwright-backed source collection driven by
   `src/config/news-sources.json`, with per-source limits and resilient failures.
+- **AI correction layer**: after analysis, a single API call validates and
+  corrects TP/SL/direction for all symbols at once, with market-driven
+  explanations shown in the Trade Log's AI column.
 - **Five pillars**: market math, analytics, search, scraping/news crawling
   (Playwright) and an AI advisor — each behind a small interface,
   dependency-injected and testable.
@@ -219,61 +222,6 @@ means the forecasts have *not* held up on that instrument's recent history.
 
 ---
 
-## Architecture
-
-Clean architecture with small, single-purpose files (SOLID, dependency
-injection throughout):
-
-```
-src/
-  domain/       Candle, Money, Signal, Symbol — pure types & value objects
-  strategies/   indicators, mathx, position-sizer, 13 strategy implementations,
-                the engine, registry and forecast (the trade the system suggests)
-  risk/         risk limits, validator and the strategy↔risk orchestrator
-  db/           Drizzle schema, the driver-agnostic client, the LostfastStore
-  services/     market-data, analytics, backtest, search, scraping/news, ai-advisor
-  backend/      NestJS + Apollo GraphQL wrapper around the Lostfast facade
-  pipeline/     CollectionPipeline — orchestrates a full run end to end
-  app/          Lostfast facade (owns the db, store and pipeline)
-  cli/          Ink UI: ascii banner, theme, App, Banner, output views, commands
-  config.ts     environment-driven configuration
-  index.tsx     entrypoint (interactive UI + headless subcommands)
-```
-
-The same `Lostfast` facade backs both the interactive shell and the headless
-subcommands, so behaviour can never drift between them.
-
----
-
-## Database
-
-Drizzle ORM (PostgreSQL dialect). The identical schema runs on the embedded
-PGlite database (default) and on a real PostgreSQL server.
-
-| Table            | Pillar     | Notes                                                        |
-| ---------------- | ---------- | ------------------------------------------------------------ |
-| `runs`           | lifecycle  | One row per `/start` or `/update` execution                  |
-| `candles`        | math       | Raw OHLCV; unique on `(symbol, interval, open_time)`         |
-| `signals`        | analytics  | Strategy outputs; unique on `(run, symbol, strategy)`        |
-| `analytics`      | analytics  | Aggregated consensus per symbol per run                      |
-| `scrapes`        | scraping   | Playwright page text, deduplicated by content hash           |
-| `ai_insights`    | AI         | Advisor summaries per symbol per run                         |
-| `search_results` | search     | **The general table — survives `/start` and `/clear`**       |
-| `news_items`     | news       | Configured source headlines/events for future assessment      |
-
-`/start` wipes the ephemeral tables (`signals`, `analytics`, `scrapes`,
-`ai_insights`, `candles`, `runs`); `/clear` keeps only the most recent run. The
-`search_results` and `news_items` tables are excluded from both.
-
-Migrations live in `drizzle/` and are applied automatically on connect. To
-regenerate them after a schema change:
-
-```bash
-npm run db:generate
-```
-
----
-
 ## Configuration
 
 All configuration is environment-driven (see `.env.example`):
@@ -301,27 +249,15 @@ All configuration is environment-driven (see `.env.example`):
 | `LOSTFAST_NEWS_DEPTH`     | `2`                           | Link depth for source-local event/article crawling.            |
 | `LOSTFAST_NEWS_PAGE_LIMIT`| `8`                           | Maximum pages to visit per configured news source.             |
 | `LOSTFAST_NEWS_LINKS_PER_PAGE` | `6`                      | Maximum follow-up links queued from one crawled page.          |
-| `ANTHROPIC_API_KEY`       | _(unset → heuristic)_        | When set, the AI advisor calls the Anthropic API.              |
-| `LOSTFAST_AI_MODEL`       | `claude-opus-4-7`             | Model used by the Anthropic advisor.                           |
+| `LOSTFAST_AI_API_URL`     | `https://api.anthropic.com/v1/messages` | OpenAI-compatible endpoint for AI corrections.               |
+| `LOSTFAST_AI_API_KEY`     | _(unset → heuristic)_        | API key (falls back to `ANTHROPIC_API_KEY`).                    |
+| `LOSTFAST_AI_MODEL`       | `claude-4.7-opus`             | Model for per-symbol advice and cross-symbol correction.        |
 
 The market source falls back gracefully: `resilient` uses live Binance data and
 transparently switches to deterministic synthetic candles if the network is
 unreachable. `coingecko` uses `/api/v3/simple/price`; `mexc` uses
 `/api/v3/ticker/price` and shapes the fetched spot rate into a candle series for
 the strategy engine.
-
-## GraphQL API
-
-The interactive CLI starts the NestJS GraphQL backend in the same process by
-default and prints the endpoint in the banner. Disable it with
-`LOSTFAST_API=0`, or run only the API from the CLI:
-
-```bash
-node dist/index.js api
-```
-
-Available operations include `status`, `strategies`, and the `start`, `update`
-and `clear` mutations.
 
 ---
 
@@ -374,9 +310,22 @@ report but does not stop the remaining sources; a failing child page is skipped.
 ## AI advisor
 
 By default a deterministic local **heuristic advisor** narrates the analytics.
-If `ANTHROPIC_API_KEY` is set, the advisor calls the Anthropic API
-(`LOSTFAST_AI_MODEL`, default `claude-opus-4-7`) and falls back to the heuristic
-on any error — so the CLI always produces an insight.
+When `LOSTFAST_AI_API_KEY` (or `ANTHROPIC_API_KEY`) is set, the system uses it
+in two places:
+
+1. **Per-symbol advice** — `LlmAdvisor` sends each symbol's analytics to the
+   configured model (`LOSTFAST_AI_MODEL`, default `claude-4.7-opus`) and stores
+   the summary. Falls back to heuristic on error.
+2. **Cross-symbol correction** — after all symbols are analysed, a single request
+   sends all symbol data + news consensus to the AI. The AI returns a
+   `CorrectedForecast[]` with `correctedTp`/`correctedSl`/`correctedDirection`
+   and a `reason` field: a market-driven explanation (news, macro, context) of
+   **why** the price will move in that direction. These reasons appear in the
+   **AI column** of the Trade Log table.
+
+The API supports both OpenAI-compatible endpoints (`/v1/chat/completions`) and
+the native Anthropic Messages API — detected automatically from the URL. On any
+failure the system degrades gracefully without interrupting the run.
 
 ---
 
