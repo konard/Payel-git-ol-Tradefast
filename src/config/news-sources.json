@@ -247,5 +247,177 @@
     "url": "https://www.reddit.com/r/MEXC/",
     "enabled": true,
     "maxItems": 6
+  },
+
+  {
+    "id": "forexfactory-economic-calendar",
+    "title": "Forex Factory Economic Calendar",
+    "kind": "economic-calendar",
+    "url": "https://www.forexfactory.com/calendar",
+    "enabled": true,
+    "maxItems": 10
+  },
+  {
+    "id": "dailyfx-economic-calendar",
+    "title": "DailyFX Economic Calendar",
+    "kind": "economic-calendar",
+    "url": "https://www.dailyfx.com/economic-calendar",
+    "enabled": true,
+    "maxItems": 10
+  },
+  {
+    "id": "myfxbook-economic-calendar",
+    "title": "Myfxbook Economic Calendar",
+    "kind": "economic-calendar",
+    "url": "https://www.myfxbook.com/forex-economic-calendar",
+    "enabled": true,
+    "maxItems": 10
+  },
+
+  {
+    "id": "cnbc-markets",
+    "title": "CNBC Markets",
+    "kind": "news",
+    "url": "https://www.cnbc.com/markets/",
+    "enabled": true,
+    "maxItems": 8
+  },
+  {
+    "id": "reuters-markets",
+    "title": "Reuters Markets",
+    "kind": "news",
+    "url": "https://www.reuters.com/markets/",
+    "enabled": true,
+    "maxItems": 8
+  },
+  {
+    "id": "marketwatch-markets",
+    "title": "MarketWatch Markets",
+    "kind": "news",
+    "url": "https://www.marketwatch.com/markets",
+    "enabled": true,
+    "maxItems": 8
+  },
+  {
+    "id": "yahoo-finance",
+    "title": "Yahoo Finance",
+    "kind": "news",
+    "url": "https://finance.yahoo.com/",
+    "enabled": true,
+    "maxItems": 8
+  },
+
+  {
+    "id": "coindesk-news",
+    "title": "CoinDesk",
+    "kind": "news",
+    "url": "https://www.coindesk.com/",
+    "enabled": true,
+    "maxItems": 8
+  },
+  {
+    "id": "cointelegraph-news",
+    "title": "Cointelegraph",
+    "kind": "news",
+    "url": "https://cointelegraph.com/",
+    "enabled": true,
+    "maxItems": 8
+  },
+  {
+    "id": "theblock-news",
+    "title": "The Block",
+    "kind": "news",
+    "url": "https://www.theblock.co/latest",
+    "enabled": true,
+    "maxItems": 8
+  },
+  {
+    "id": "decrypt-news",
+    "title": "Decrypt",
+    "kind": "news",
+    "url": "https://decrypt.co/news",
+    "enabled": true,
+    "maxItems": 8
+  },
+  {
+    "id": "cryptoslate-news",
+    "title": "CryptoSlate",
+    "kind": "news",
+    "url": "https://cryptoslate.com/news/",
+    "enabled": true,
+    "maxItems": 8
+  },
+  {
+    "id": "bitcoinmagazine-news",
+    "title": "Bitcoin Magazine",
+    "kind": "news",
+    "url": "https://bitcoinmagazine.com/articles",
+    "enabled": true,
+    "maxItems": 8
+  },
+  {
+    "id": "coingecko-news",
+    "title": "CoinGecko News",
+    "kind": "news",
+    "url": "https://www.coingecko.com/en/news",
+    "enabled": true,
+    "maxItems": 8
+  },
+  {
+    "id": "coinmarketcap-headlines",
+    "title": "CoinMarketCap Headlines",
+    "kind": "news",
+    "url": "https://coinmarketcap.com/headlines/news/",
+    "enabled": true,
+    "maxItems": 8
+  },
+
+  {
+    "id": "reddit-bitcoin",
+    "title": "Reddit r/Bitcoin",
+    "kind": "reddit",
+    "url": "https://www.reddit.com/r/Bitcoin/",
+    "enabled": true,
+    "maxItems": 6
+  },
+  {
+    "id": "reddit-ethereum",
+    "title": "Reddit r/ethereum",
+    "kind": "reddit",
+    "url": "https://www.reddit.com/r/ethereum/",
+    "enabled": true,
+    "maxItems": 6
+  },
+  {
+    "id": "reddit-cryptomarkets",
+    "title": "Reddit r/CryptoMarkets",
+    "kind": "reddit",
+    "url": "https://www.reddit.com/r/CryptoMarkets/",
+    "enabled": true,
+    "maxItems": 6
+  },
+  {
+    "id": "reddit-defi",
+    "title": "Reddit r/defi",
+    "kind": "reddit",
+    "url": "https://www.reddit.com/r/defi/",
+    "enabled": true,
+    "maxItems": 6
+  },
+  {
+    "id": "reddit-altcoin",
+    "title": "Reddit r/Altcoin",
+    "kind": "reddit",
+    "url": "https://www.reddit.com/r/Altcoin/",
+    "enabled": true,
+    "maxItems": 6
+  },
+  {
+    "id": "reddit-cryptotechnology",
+    "title": "Reddit r/CryptoTechnology",
+    "kind": "reddit",
+    "url": "https://www.reddit.com/r/CryptoTechnology/",
+    "enabled": true,
+    "maxItems": 6
   }
 ]

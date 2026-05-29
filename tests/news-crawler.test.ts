@@ -42,6 +42,31 @@ const ISSUE_SOURCE_URLS = [
   'https://www.reddit.com/r/OKX/',
   'https://www.mexc.com/blog',
   'https://www.reddit.com/r/MEXC/',
+  // Additional economic calendars
+  'https://www.forexfactory.com/calendar',
+  'https://www.dailyfx.com/economic-calendar',
+  'https://www.myfxbook.com/forex-economic-calendar',
+  // Additional global news portals
+  'https://www.cnbc.com/markets/',
+  'https://www.reuters.com/markets/',
+  'https://www.marketwatch.com/markets',
+  'https://finance.yahoo.com/',
+  // Crypto-native news portals
+  'https://www.coindesk.com/',
+  'https://cointelegraph.com/',
+  'https://www.theblock.co/latest',
+  'https://decrypt.co/news',
+  'https://cryptoslate.com/news/',
+  'https://bitcoinmagazine.com/articles',
+  'https://www.coingecko.com/en/news',
+  'https://coinmarketcap.com/headlines/news/',
+  // Crypto Reddit communities
+  'https://www.reddit.com/r/Bitcoin/',
+  'https://www.reddit.com/r/ethereum/',
+  'https://www.reddit.com/r/CryptoMarkets/',
+  'https://www.reddit.com/r/defi/',
+  'https://www.reddit.com/r/Altcoin/',
+  'https://www.reddit.com/r/CryptoTechnology/',
 ];
 
 describe('news source configuration', () => {
