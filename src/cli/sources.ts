@@ -8,25 +8,31 @@ export interface SourceGroup {
 export type SourceGroupId =
   | 'economic-calendars'
   | 'news-portals'
+  | 'crypto-news'
   | 'reddit-communities'
+  | 'crypto-communities'
   | 'exchange-communities';
 
 const SOURCE_GROUPS: SourceGroup[] = [
   {
     id: 'economic-calendars',
     label: 'Economic Calendars',
-    description: 'Investing.com, TradingView, Alfa-Forex, Forex Club',
+    description: 'Investing.com, TradingView, Alfa-Forex, Forex Club, Forex Factory, DailyFX, Myfxbook',
     sourceIds: [
       'investing-economic-calendar',
       'tradingview-economic-calendar',
       'alfaforex-economic-calendar',
       'fxclub-economic-calendar',
+      'forexfactory-economic-calendar',
+      'dailyfx-economic-calendar',
+      'myfxbook-economic-calendar',
     ],
   },
   {
     id: 'news-portals',
     label: 'News Portals',
-    description: 'TradingView News, Investing.com, RBC, Kommersant, Mail.ru, LiteFinance, Euronews, TradingView Markets',
+    description:
+      'TradingView News, Investing.com, RBC, Kommersant, Mail.ru, LiteFinance, Euronews, TradingView Markets, CNBC, Reuters, MarketWatch, Yahoo Finance',
     sourceIds: [
       'tradingview-news',
       'investing-news',
@@ -36,6 +42,25 @@ const SOURCE_GROUPS: SourceGroup[] = [
       'litefinance-forex-news',
       'euronews-markets',
       'tradingview-markets',
+      'cnbc-markets',
+      'reuters-markets',
+      'marketwatch-markets',
+      'yahoo-finance',
+    ],
+  },
+  {
+    id: 'crypto-news',
+    label: 'Crypto News',
+    description: 'CoinDesk, Cointelegraph, The Block, Decrypt, CryptoSlate, Bitcoin Magazine, CoinGecko News, CoinMarketCap Headlines',
+    sourceIds: [
+      'coindesk-news',
+      'cointelegraph-news',
+      'theblock-news',
+      'decrypt-news',
+      'cryptoslate-news',
+      'bitcoinmagazine-news',
+      'coingecko-news',
+      'coinmarketcap-headlines',
     ],
   },
   {
@@ -53,6 +78,19 @@ const SOURCE_GROUPS: SourceGroup[] = [
       'reddit-cryptocurrency',
       'reddit-econ',
       'reddit-financialnews',
+    ],
+  },
+  {
+    id: 'crypto-communities',
+    label: 'Crypto Communities',
+    description: 'r/Bitcoin, r/ethereum, r/CryptoMarkets, r/defi, r/Altcoin, r/CryptoTechnology',
+    sourceIds: [
+      'reddit-bitcoin',
+      'reddit-ethereum',
+      'reddit-cryptomarkets',
+      'reddit-defi',
+      'reddit-altcoin',
+      'reddit-cryptotechnology',
     ],
   },
   {
@@ -92,6 +130,8 @@ export function resolveSourceIds(
 export const DEFAULT_ENABLED_GROUPS: SourceGroupId[] = [
   'economic-calendars',
   'news-portals',
+  'crypto-news',
   'reddit-communities',
+  'crypto-communities',
   'exchange-communities',
 ];

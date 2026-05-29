@@ -15,8 +15,10 @@ interactive terminal UI.
 
 ## Highlights
 
-- **30 research sources** across 4 groups: economic calendars, news portals,
-  Reddit communities (10 subreddits with comment traversal), and exchange communities
+- **51 research sources** across 6 groups: economic calendars, news portals,
+  crypto news portals (CoinDesk, Cointelegraph, The Block, Decrypt, …), Reddit
+  communities (10 subreddits with comment traversal), crypto communities
+  (r/Bitcoin, r/ethereum, r/CryptoMarkets, …), and exchange communities
   (Binance, Bybit, OKX, MEXC blogs + subreddits).
 - **Configurable research depth**: `/serching-level` sets crawl aggressiveness from
   Normal (fast) to Max (full comment graph), persisted across sessions.
@@ -35,7 +37,7 @@ interactive terminal UI.
   `/backtest`, `/news`, `/clear`, `/clear-chat`, `/status`, `/strategies`, `/theme`,
   `/exchange`, `/currency`, `/operating-mode`, `/operating-mode-time`,
   `/serching-level`, `/serching-platforms`, `/ratings`, `/api`, `/help`, `/exit`.
-- **Source credibility ratings**: `/ratings` shows all 30 sources ranked by
+- **Source credibility ratings**: `/ratings` shows all 51 sources ranked by
   credibility score. Adjust ratings with `/ratings correct` / `incorrect` /
   `loud-claim` or a numeric grade (`/ratings "Хабр" -1`). AI can modify ratings
   via the `run_ratings_adjust` tool on user feedback.
@@ -115,7 +117,7 @@ TRADEFAST_MARKET_SOURCE=synthetic TRADEFAST_DATA_DIR=:memory: node dist/index.js
 | `/operating-mode [name]` | Open the trading-style selector pop-up, or switch directly by name (`long-term`, `medium-term`, `scalping`). Applies that horizon's timeframe. |
 | `/operating-mode-time [tf]` | Open the timeframe selector, or set it directly (`1m`–`1d`) to fine-tune within the current mode. |
 | `/serching-level [level]` | Set crawl depth/resolution: `normal` (fast, depth 2), `high` (deep, depth 4), or `max` (full graph, depth 8 with comment traversal). Opens a pop-up without argument. |
-| `/serching-platforms` | Toggle source groups on/off: economic calendars, news portals, Reddit communities, exchange communities. Opens a multi-select pop-up. |
+| `/serching-platforms` | Toggle source groups on/off: economic calendars, news portals, crypto news, Reddit communities, crypto communities, exchange communities. Opens a multi-select pop-up. |
 | `/currency [symbol]` | Run a full forecast for a single symbol with news sentiment and price chart. |
 | `/exchange` | Swap the asset being researched — opens a pop-up to select from trading symbols. |
 | `/ratings` | Show source credibility ratings. Subcommands: `correct`, `incorrect`, `loud-claim`, or a numeric grade (`/ratings "Хабр" -1`). |
@@ -302,17 +304,19 @@ npx playwright install chromium
 
 ## News Crawler
 
-The `/news` command crawls **30 market/economic sources** listed in
+The `/news` command crawls **51 market/economic sources** listed in
 `src/config/news-sources.json` and upserts normalized items into `news_items`.
 Each source has an id, title, kind, URL, enabled flag and optional per-source
-limit. Sources are grouped into 4 platform groups:
+limit. Sources are grouped into 6 platform groups:
 
-| Group                | Sources                                                                 |
-| -------------------- | ----------------------------------------------------------------------- |
-| `economic-calendars` | Investing, TradingView, Alfa-Forex, Forex Club — economic calendars.    |
-| `news-portals`       | TradingView, Investing, RBC, Kommersant, Mail.ru, LiteFinance, Euronews — market/economics news. |
-| `reddit-communities` | 10 subreddits (CryptoCurrency, CryptoMarkets, altcoin, Bitcoin, ethtrader, Solana, solend, CryptoMoonShots, trading, Forex) — kind: `reddit`. |
-| `exchange-communities` | Binance, Bybit, OKX, MEXC blogs + Binance and Bybit subreddits.       |
+| Group                  | Sources                                                                 |
+| ---------------------- | ----------------------------------------------------------------------- |
+| `economic-calendars`   | Investing, TradingView, Alfa-Forex, Forex Club, Forex Factory, DailyFX, Myfxbook — economic calendars. |
+| `news-portals`         | TradingView, Investing, RBC, Kommersant, Mail.ru, LiteFinance, Euronews, CNBC, Reuters, MarketWatch, Yahoo Finance — market/economics news. |
+| `crypto-news`          | CoinDesk, Cointelegraph, The Block, Decrypt, CryptoSlate, Bitcoin Magazine, CoinGecko, CoinMarketCap — crypto-native news. |
+| `reddit-communities`   | 10 finance/market subreddits (economy, Finance, stocks, investing, wallstreetbets, StockMarket, Forex, CryptoCurrency, econ, FinancialNews) — kind: `reddit`. |
+| `crypto-communities`   | 6 crypto subreddits (Bitcoin, ethereum, CryptoMarkets, defi, Altcoin, CryptoTechnology) — kind: `reddit`. |
+| `exchange-communities` | Binance, Bybit, OKX, MEXC blogs + their subreddits.                     |
 
 Sources with `kind: "reddit"` use a specialized extractor that reads Reddit
 threads, extracts the self-text/comments, and follows comment-thread links to
