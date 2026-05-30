@@ -58,7 +58,12 @@ interactive terminal UI.
   dependency-injected and testable.
 - **Works offline or live**: deterministic synthetic market data keeps CI and
   demos reproducible; Binance, CoinGecko and MEXC adapters can pull real crypto
-  market rates.
+  market rates, and a Frankfurter (ECB) adapter pulls live forex rates for the
+  Pocket Option binary-options venue.
+- **Spot and binary options**: crypto exchanges bracket trades with a
+  take-profit and stop-loss; Pocket Option, a forex binary-options venue, has no
+  TP/SL — so its forecasts replace those levels with an **expiry time** (how long
+  to hold the directional bet) while every strategy algorithm stays identical.
 - **In-process NestJS GraphQL backend**: the interactive CLI starts a local
   GraphQL endpoint without a second service process.
 - **Dockerised**: `docker compose up` brings up PostgreSQL and the CLI.
@@ -119,7 +124,7 @@ TRADEFAST_MARKET_SOURCE=synthetic TRADEFAST_DATA_DIR=:memory: node dist/index.js
 | `/serching-level [level]` | Set crawl depth/resolution: `normal` (fast, depth 2), `high` (deep, depth 4), or `max` (full graph, depth 8 with comment traversal). Opens a pop-up without argument. |
 | `/serching-platforms` | Toggle source groups on/off: economic calendars, news portals, crypto news, Reddit communities, crypto communities, exchange communities. Opens a multi-select pop-up. |
 | `/currency [symbol]` | Run a full forecast for a single symbol with news sentiment and price chart. |
-| `/exchange` | Swap the asset being researched — opens a pop-up to select from trading symbols. |
+| `/exchange [name]` | Switch the venue/data source: `binance`, `okx`, `bybit`, `mexc` (crypto spot) or `pocketoption` (forex binary options). Pocket Option swaps in forex majors and renders an expiry **Time** column instead of TP/SL. Opens a pop-up without an argument. |
 | `/ratings` | Show source credibility ratings. Subcommands: `correct`, `incorrect`, `loud-claim`, or a numeric grade (`/ratings "Хабр" -1`). |
 | `/clear-chat` | Clear the chat transcript and reset AI conversation history, restoring the welcome banner and tips. |
 | `/api`         | Show the in-process GraphQL endpoint.                                        |
@@ -239,6 +244,13 @@ Backtest — forecast accuracy (TP before SL)
 Use it before trading a symbol: a negative expectancy or a profit factor below 1
 means the forecasts have *not* held up on that instrument's recent history.
 
+On a binary-options venue (Pocket Option) the same walk-forward harness settles
+each trade differently: there is no TP/SL to hit, so a position is held for its
+**expiry** (`EXPIRY_BARS` bars of the analysed timeframe) and then scored purely
+on direction — a win if price closed beyond the entry the predicted way. Wins
+pay the configured binary payout (~0.92R) and losses cost the full stake (−1R),
+so the same Win % / expectancy / profit-factor rollup still applies.
+
 ---
 
 ## Configuration
@@ -249,11 +261,13 @@ All configuration is environment-driven (see `.env.example`):
 | ------------------------- | ----------------------------- | -------------------------------------------------------------- |
 | `DATABASE_URL`            | _(unset → PGlite)_            | PostgreSQL connection string. Unset uses embedded PGlite.      |
 | `TRADEFAST_DATA_DIR`       | `.tradefast/pgdata`            | PGlite data directory (`:memory:` for ephemeral).              |
-| `TRADEFAST_MARKET_SOURCE`  | `resilient`                   | `resilient` \| `live` \| `binance` \| `coingecko` \| `mexc` \| `synthetic`. |
+| `TRADEFAST_MARKET_SOURCE`  | `resilient`                   | `resilient` \| `live` \| `binance` \| `coingecko` \| `mexc` \| `pocketoption` \| `synthetic`. |
 | `TRADEFAST_MARKET_API`     | `https://api.binance.com`     | Binance REST base URL.                                         |
 | `TRADEFAST_COINGECKO_API`  | `https://api.coingecko.com`   | CoinGecko REST base URL.                                       |
 | `TRADEFAST_MEXC_API`       | `https://api.mexc.com`        | MEXC REST base URL.                                            |
-| `TRADEFAST_SYMBOLS`        | `BTCUSDT,ETHUSDT,SOLUSDT`     | Comma-separated symbols to analyse.                            |
+| `TRADEFAST_FRANKFURTER_API`| `https://api.frankfurter.dev` | Frankfurter (ECB) forex REST base URL, used by Pocket Option. |
+| `TRADEFAST_EXCHANGE`       | `bybit`                       | Venue: `binance` \| `okx` \| `bybit` \| `mexc` \| `pocketoption`. |
+| `TRADEFAST_SYMBOLS`        | `BTCUSDT,ETHUSDT,SOLUSDT`     | Comma-separated symbols to analyse (defaults to forex majors like `EURUSD` when the exchange is `pocketoption`). |
 | `TRADEFAST_INTERVAL`       | `1h`                          | Candle interval.                                               |
 | `TRADEFAST_MODE`           | `medium-term`                 | Initial operating mode (`long-term`, `medium-term`, `scalping`). |
 | `TRADEFAST_CANDLE_LIMIT`   | `200`                         | Number of candles to fetch per symbol.                         |
@@ -279,7 +293,12 @@ The market source falls back gracefully: `resilient` uses live Binance data and
 transparently switches to deterministic synthetic candles if the network is
 unreachable. `coingecko` uses `/api/v3/simple/price`; `mexc` uses
 `/api/v3/ticker/price` and shapes the fetched spot rate into a candle series for
-the strategy engine.
+the strategy engine. `pocketoption` pulls the live forex rate from Frankfurter
+(`/v2/rate/EUR/USD` → `{ "rates": { "USD": 1.15186 } }`) and shapes that single
+ECB reference quote into the same candle series, so the unchanged strategy
+algorithms run on forex pairs. Selecting Pocket Option via `/exchange` (or
+`TRADEFAST_EXCHANGE=pocketoption`) automatically switches the default symbol
+universe to forex majors (`EURUSD`, `GBPUSD`, `USDJPY`, …).
 
 ---
 
