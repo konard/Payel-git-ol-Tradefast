@@ -9,7 +9,7 @@ import { COMMANDS, completeCommand, parseCommand, suggestCommands, type CommandS
 import { OutputLine, type OutputItem } from './output.js';
 import { saveTheme, saveExchange, saveInterval, saveMode, saveSearchingLevel, saveSearchingPlatforms } from './preferences.js';
 import { getTheme, themeNames, type CliTheme, type ThemeName } from './theme.js';
-import { getExchange, exchangeNames, type ExchangeName } from './exchanges.js';
+import { getExchange, exchangeNames, isKnownExchange, isBinaryOptions, type ExchangeName } from './exchanges.js';
 import { getInterval, intervalNames, type IntervalName } from './intervals.js';
 import { getMode, modeNames, type ModeName } from './modes.js';
 import { searchLevelNames, getSearchLevel, type SearchLevelName } from './search-level.js';
@@ -410,7 +410,10 @@ export function App({ app, version, apiUrl, promptOperatingMode }: AppProps): Re
       setExchangeSelectorOpen(false);
       void saveExchange(next.name as ExchangeName);
       app.setExchange(next.name);
-      push({ kind: 'text', text: `Exchange: ${next.label} (live data source updated)`, color: theme.colors.info });
+      const venueNote = isBinaryOptions(next.name)
+        ? ` — binary options: forecasts show an expiry time instead of TP/SL (symbols: ${app.config.symbols.join(', ')})`
+        : ' (live data source updated)';
+      push({ kind: 'text', text: `Exchange: ${next.label}${venueNote}`, color: theme.colors.info });
     },
     [app, push, theme],
   );
@@ -685,15 +688,11 @@ export function App({ app, version, apiUrl, promptOperatingMode }: AppProps): Re
           push({ kind: 'text', text: `Current exchange: ${getExchange(app.config.exchange).label}`, color: theme.colors.info });
           return;
         }
-        const next = getExchange(args[0]);
-        if (next.name !== args[0].toLowerCase()) {
+        if (!isKnownExchange(args[0])) {
           push({ kind: 'error', text: `Unknown exchange "${args[0]}". Available: ${exchangeNames().join(', ')}` });
           return;
         }
-        setExchange(next.name as ExchangeName);
-        void saveExchange(next.name as ExchangeName);
-        app.setExchange(next.name);
-        push({ kind: 'text', text: `Exchange: ${next.label} (live data source updated)`, color: theme.colors.info });
+        applyExchange(getExchange(args[0]).name as ExchangeName);
         return;
       }
       if (name === 'operating-mode') {
@@ -927,15 +926,10 @@ export function App({ app, version, apiUrl, promptOperatingMode }: AppProps): Re
               }
               case 'run_exchange': {
                 const eName = (toolArgs.name as string) || '';
-                if (eName) {
+                if (eName && isKnownExchange(eName)) {
                   const next = getExchange(eName);
-                  if (next.name === eName.toLowerCase()) {
-                    setExchange(next.name as ExchangeName);
-                    void saveExchange(next.name as ExchangeName);
-                    app.setExchange(next.name);
-                    push({ kind: 'text', text: `Exchange: ${next.label} (live data source updated)`, color: theme.colors.info });
-                    return `Exchange changed to ${next.label}.`;
-                  }
+                  applyExchange(next.name as ExchangeName);
+                  return `Exchange changed to ${next.label}.`;
                 }
                 openExchangeSelector();
                 return 'Exchange selector opened — pick an exchange.';
@@ -1095,7 +1089,7 @@ export function App({ app, version, apiUrl, promptOperatingMode }: AppProps): Re
         setProgress(null);
       }
     },
-    [apiUrl, app, openThemeSelector, openExchangeSelector, openIntervalSelector, openModeSelector, openCurrencySelector, applyMode, applyLevel, applyPlatforms, searchingLevel, enabledPlatforms, newsCrawlOptions, push, quit, setHistory, theme, version],
+    [apiUrl, app, openThemeSelector, openExchangeSelector, applyExchange, openIntervalSelector, openModeSelector, openCurrencySelector, applyMode, applyLevel, applyPlatforms, searchingLevel, enabledPlatforms, newsCrawlOptions, push, quit, setHistory, theme, version],
   );
 
   const onSubmit = useCallback(

@@ -2,7 +2,13 @@ import { describe, expect, it } from 'vitest';
 
 import type { Candle } from '../src/domain/candle.js';
 import { AnalyticsService } from '../src/services/analytics.js';
-import { buildForecast, REWARD_RISK_RATIO } from '../src/strategies/forecast.js';
+import {
+  buildForecast,
+  EXPIRY_BARS,
+  expiryMinutesFor,
+  intervalMinutes,
+  REWARD_RISK_RATIO,
+} from '../src/strategies/forecast.js';
 
 /** Build a candle series from a list of close prices (tight, well-formed bars). */
 const series = (closes: number[]): Candle[] =>
@@ -66,5 +72,32 @@ describe('buildForecast', () => {
   it('carries the analysed symbol through to the forecast', () => {
     const forecast = buildForecast(analytics.analyze(upTrend, 'XRPUSDT'));
     expect(forecast.symbol).toBe('XRPUSDT');
+  });
+});
+
+describe('binary-options expiry (Pocket Option)', () => {
+  it('derives an expiry of EXPIRY_BARS bars from the analysed timeframe', () => {
+    expect(expiryMinutesFor('1h')).toBe(intervalMinutes('1h') * EXPIRY_BARS);
+    expect(expiryMinutesFor('5m')).toBe(5 * EXPIRY_BARS);
+    expect(expiryMinutesFor('1d')).toBe(1440 * EXPIRY_BARS);
+    // Unknown intervals fall back to one hour.
+    expect(expiryMinutesFor('nonsense')).toBe(60 * EXPIRY_BARS);
+  });
+
+  it('populates the expiry time for a directional forecast using the given interval', () => {
+    const forecast = buildForecast(analytics.analyze(upTrend, 'EURUSD'), { interval: '5m' });
+    expect(forecast.direction).toBe('long');
+    expect(forecast.expiryMinutes).toBe(expiryMinutesFor('5m'));
+  });
+
+  it('defaults the expiry interval to 1h when none is supplied', () => {
+    const forecast = buildForecast(analytics.analyze(upTrend, 'EURUSD'));
+    expect(forecast.expiryMinutes).toBe(expiryMinutesFor('1h'));
+  });
+
+  it('leaves the expiry null when there is no directional signal', () => {
+    const forecast = buildForecast(analytics.analyze(series([100, 101, 102]), 'EURUSD'), { interval: '1h' });
+    expect(forecast.direction).toBe('');
+    expect(forecast.expiryMinutes).toBeNull();
   });
 });

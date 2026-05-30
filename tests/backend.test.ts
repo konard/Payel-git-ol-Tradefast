@@ -30,6 +30,8 @@ const facade: TradefastApiFacade = {
     symbols: [],
     searchResults: 0,
     durationMs: 1,
+    validation: null,
+    interval: '1h',
   }),
   update: async () => ({
     runId: 3,
@@ -37,6 +39,8 @@ const facade: TradefastApiFacade = {
     symbols: [],
     searchResults: 0,
     durationMs: 1,
+    validation: null,
+    interval: '1h',
   }),
   clear: async () => 1,
 };

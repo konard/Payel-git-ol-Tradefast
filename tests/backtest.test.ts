@@ -4,6 +4,8 @@ import type { Candle } from '../src/domain/candle.js';
 import {
   aggregateBacktests,
   backtestSymbol,
+  BINARY_PAYOUT,
+  simulateBinaryTrade,
   simulateTrade,
   type BacktestResult,
 } from '../src/services/backtest.js';
@@ -90,6 +92,79 @@ describe('simulateTrade', () => {
 
     expect(trade.outcome).toBe('timeout');
     expect(trade.exitIndex).toBe(2);
+  });
+});
+
+describe('simulateBinaryTrade (Pocket Option expiry settlement)', () => {
+  it('wins when a long closes above entry after the expiry, paying the binary payout', () => {
+    // Held for 2 bars; the bar at the expiry index closes at 105 (> entry 100).
+    const candles = [bar(100, 101, 99, 100, 0), bar(100, 106, 99, 102, 1), bar(102, 107, 101, 105, 2)];
+    const trade = simulateBinaryTrade(candles, 0, { direction: 'long', entry: 100 }, 2);
+
+    expect(trade.outcome).toBe('tp');
+    expect(trade.exitIndex).toBe(2);
+    expect(trade.exitPrice).toBe(105);
+    expect(trade.rMultiple).toBeCloseTo(BINARY_PAYOUT, 8);
+  });
+
+  it('loses the full stake when a long closes below entry at expiry', () => {
+    const candles = [bar(100, 101, 99, 100, 0), bar(100, 101, 96, 98, 1), bar(98, 99, 94, 96, 2)];
+    const trade = simulateBinaryTrade(candles, 0, { direction: 'long', entry: 100 }, 2);
+
+    expect(trade.outcome).toBe('sl');
+    expect(trade.exitPrice).toBe(96);
+    expect(trade.rMultiple).toBeCloseTo(-1, 8);
+  });
+
+  it('scores a short by the mirror rule (win when price closes below entry)', () => {
+    const candles = [bar(100, 101, 99, 100, 0), bar(100, 101, 94, 96, 1), bar(96, 97, 92, 94, 2)];
+    const trade = simulateBinaryTrade(candles, 0, { direction: 'short', entry: 100 }, 2);
+
+    expect(trade.outcome).toBe('tp');
+    expect(trade.exitPrice).toBe(94);
+    expect(trade.rMultiple).toBeCloseTo(BINARY_PAYOUT, 8);
+  });
+
+  it('treats a close exactly at entry as a refunded push (no profit, no loss)', () => {
+    const candles = [bar(100, 101, 99, 100, 0), bar(100, 101, 99, 100, 1), bar(100, 101, 99, 100, 2)];
+    const trade = simulateBinaryTrade(candles, 0, { direction: 'long', entry: 100 }, 2);
+
+    expect(trade.outcome).toBe('timeout');
+    expect(trade.rMultiple).toBe(0);
+  });
+
+  it('clamps the expiry to the last available bar near the end of the series', () => {
+    const candles = [bar(100, 101, 99, 100, 0), bar(100, 106, 99, 104, 1)];
+    const trade = simulateBinaryTrade(candles, 0, { direction: 'long', entry: 100 }, 5);
+
+    expect(trade.exitIndex).toBe(1);
+    expect(trade.exitPrice).toBe(104);
+    expect(trade.outcome).toBe('tp');
+  });
+});
+
+describe('backtestSymbol — binary-options mode', () => {
+  it('settles every trade on its expiry, so there are no horizon-style timeouts', () => {
+    const upTrend = series(Array.from({ length: 200 }, (_, i) => 100 + i * 1.5));
+    const result = backtestSymbol(upTrend, 'EURUSD', { warmup: 60, binary: true });
+
+    expect(result.trades).toBeGreaterThan(0);
+    // A clean uptrend resolves binary longs as wins, not pushes.
+    expect(result.wins).toBeGreaterThan(result.losses);
+    for (const trade of result.outcomes) {
+      // Each trade is held for exactly the expiry window.
+      expect(trade.barsHeld).toBeGreaterThan(0);
+      // Win rate book-keeping still adds up.
+      expect(['tp', 'sl', 'timeout']).toContain(trade.outcome);
+    }
+    expect(result.wins + result.losses + result.timeouts).toBe(result.trades);
+  });
+
+  it('reports a positive expectancy on a persistent uptrend with the binary payout', () => {
+    const upTrend = series(Array.from({ length: 200 }, (_, i) => 100 + i * 1.5));
+    const result = backtestSymbol(upTrend, 'EURUSD', { warmup: 60, binary: true });
+
+    expect(result.expectancy).toBeGreaterThan(0);
   });
 });
 

@@ -1,7 +1,15 @@
 import type { Candle } from '../domain/candle.js';
 import { DEFAULT_PARAMETERS, type StrategyParameters } from '../domain/signal.js';
-import { buildForecast } from '../strategies/forecast.js';
+import { buildForecast, EXPIRY_BARS } from '../strategies/forecast.js';
 import { AnalyticsService } from './analytics.js';
+
+/**
+ * Payout per unit staked on a winning binary-options trade (Pocket Option-style,
+ * ~92%). A loss costs the full stake (−1). Used only by the binary-options
+ * backtest path, where a trade settles purely on its expiry instead of on a
+ * take-profit / stop-loss bracket.
+ */
+export const BINARY_PAYOUT = 0.92;
 
 /**
  * Walk-forward backtester — the honest answer to "is the system accurate?".
@@ -27,6 +35,14 @@ export interface BacktestOptions {
   horizon?: number;
   params?: StrategyParameters;
   accountBalance?: number;
+  /**
+   * Settle trades as binary options — held for a fixed expiry then scored by
+   * direction — instead of bracketing them with a take-profit / stop-loss. Used
+   * for Pocket Option, which has no TP/SL, only an expiry time.
+   */
+  binary?: boolean;
+  /** Bars a binary-options trade is held before it expires. Default {@link EXPIRY_BARS}. */
+  expiryBars?: number;
 }
 
 export type TradeOutcome = 'tp' | 'sl' | 'timeout';
@@ -117,6 +133,41 @@ export function simulateTrade(
   });
 }
 
+/**
+ * Settle a binary-options trade. The position is held for exactly `expiryBars`
+ * bars and then scored purely on direction: a win if price closed beyond the
+ * entry in the predicted direction, a loss if it closed against it. There are no
+ * TP/SL levels — the outcome maps onto `tp` (win) / `sl` (loss) / `timeout`
+ * (price closed exactly at entry, a push) so it rolls up with the spot metrics.
+ * A win pays `payout` R, a loss costs the full 1R stake.
+ */
+export function simulateBinaryTrade(
+  candles: readonly Candle[],
+  entryIndex: number,
+  forecast: { direction: 'long' | 'short'; entry: number },
+  expiryBars: number,
+  payout = BINARY_PAYOUT,
+): BacktestTrade {
+  const { direction, entry } = forecast;
+  const exitIndex = Math.min(entryIndex + Math.max(1, expiryBars), candles.length - 1);
+  const exitPrice = candles[exitIndex].close;
+  const move = direction === 'long' ? exitPrice - entry : entry - exitPrice;
+  const outcome: TradeOutcome = move > 0 ? 'tp' : move < 0 ? 'sl' : 'timeout';
+  return {
+    entryIndex,
+    direction,
+    entry,
+    // No bracket levels on a binary option — surface the entry as a placeholder.
+    tp: entry,
+    sl: entry,
+    outcome,
+    exitIndex,
+    exitPrice,
+    barsHeld: exitIndex - entryIndex,
+    rMultiple: outcome === 'tp' ? payout : outcome === 'sl' ? -1 : 0,
+  };
+}
+
 function summarise(symbol: string, candleCount: number, trades: BacktestTrade[]): BacktestResult {
   let wins = 0;
   let losses = 0;
@@ -164,6 +215,8 @@ export function backtestSymbol(
   const horizon = Math.max(1, options.horizon ?? 48);
   const params = options.params ?? DEFAULT_PARAMETERS;
   const accountBalance = options.accountBalance ?? 10_000;
+  const binary = options.binary === true;
+  const expiryBars = Math.max(1, options.expiryBars ?? EXPIRY_BARS);
   const analytics = new AnalyticsService();
 
   const trades: BacktestTrade[] = [];
@@ -171,9 +224,27 @@ export function backtestSymbol(
   while (i < candles.length - 1) {
     const known = candles.slice(0, i + 1);
     const forecast = buildForecast(analytics.analyze(known, symbol, params, accountBalance));
+    const directional = forecast.direction === 'long' || forecast.direction === 'short';
+
+    if (binary) {
+      // Binary options need only a direction and an entry — they settle on time.
+      if (!directional || forecast.entry == null) {
+        i += 1;
+        continue;
+      }
+      const trade = simulateBinaryTrade(
+        candles,
+        i,
+        { direction: forecast.direction as 'long' | 'short', entry: forecast.entry as number },
+        expiryBars,
+      );
+      trades.push(trade);
+      i = trade.exitIndex + 1;
+      continue;
+    }
 
     const actionable =
-      (forecast.direction === 'long' || forecast.direction === 'short') &&
+      directional &&
       forecast.entry != null &&
       forecast.tp != null &&
       forecast.sl != null &&

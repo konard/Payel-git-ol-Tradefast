@@ -15,7 +15,7 @@ export interface TradefastConfig {
   apiPort: number;
 }
 
-const DEFAULT_SYMBOLS = [
+export const DEFAULT_SYMBOLS = [
   'BTCUSDT', 'ETHUSDT', 'SOLUSDT', 'XRPUSDT', 'ADAUSDT',
   'DOGEUSDT', 'BNBUSDT', 'AVAXUSDT', 'DOTUSDT', 'LINKUSDT',
   'LTCUSDT', 'NEARUSDT', 'APTUSDT', 'ARBUSDT', 'SUIUSDT',
@@ -24,6 +24,27 @@ const DEFAULT_SYMBOLS = [
   'AAVEUSDT', 'ICPUSDT', 'INJUSDT', 'RUNEUSDT', 'OPUSDT',
   'FETUSDT', 'KASUSDT',
 ];
+
+/**
+ * Pocket Option is a forex binary-options venue, so it trades currency pairs
+ * (Frankfurter / ECB reference rates) rather than crypto tickers. These majors
+ * are used as defaults whenever Pocket Option is the selected exchange and the
+ * user has not pinned their own `TRADEFAST_SYMBOLS`.
+ */
+export const FOREX_DEFAULT_SYMBOLS = [
+  'EURUSD', 'GBPUSD', 'USDJPY', 'AUDUSD', 'USDCHF',
+  'USDCAD', 'NZDUSD', 'EURGBP', 'EURJPY', 'GBPJPY',
+];
+
+/** True when `exchange` names the Pocket Option binary-options venue. */
+function isPocketOption(exchange?: string): boolean {
+  return (exchange ?? '').toLowerCase().replace(/[\s_-]+/g, '') === 'pocketoption';
+}
+
+/** The default symbol universe for an exchange: forex for Pocket Option, crypto otherwise. */
+export function defaultSymbolsForExchange(exchange?: string): string[] {
+  return isPocketOption(exchange) ? [...FOREX_DEFAULT_SYMBOLS] : [...DEFAULT_SYMBOLS];
+}
 
 function envFlag(name: string, fallback: boolean): boolean {
   const value = process.env[name];
@@ -37,8 +58,10 @@ export function loadConfig(overrides: Partial<TradefastConfig> = {}): TradefastC
     .map((s) => s.trim().toUpperCase())
     .filter(Boolean);
 
+  const exchange = overrides.exchange ?? process.env.TRADEFAST_EXCHANGE ?? 'bybit';
+
   return {
-    symbols: overrides.symbols ?? (symbols.length > 0 ? symbols : DEFAULT_SYMBOLS),
+    symbols: overrides.symbols ?? (symbols.length > 0 ? symbols : defaultSymbolsForExchange(exchange)),
     interval: overrides.interval ?? process.env.TRADEFAST_INTERVAL ?? '1h',
     candleLimit: overrides.candleLimit ?? Number(process.env.TRADEFAST_CANDLE_LIMIT ?? 200),
     accountBalance: overrides.accountBalance ?? Number(process.env.TRADEFAST_ACCOUNT_BALANCE ?? 10_000),

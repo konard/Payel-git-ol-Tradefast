@@ -13,6 +13,8 @@ export interface CollectOptions {
   limit?: number;
   params?: StrategyParameters;
   accountBalance?: number;
+  /** The venue this run targets — drives whether the Trade Log shows TP/SL or an expiry time. */
+  exchange?: string;
   /** When true, skip the extra AI validation API call (used when AI chat runs the command itself). */
   skipAiValidation?: boolean;
 }
@@ -46,6 +48,10 @@ export interface RunReport {
   searchResults: number;
   durationMs: number;
   validation: ValidationResult | null;
+  /** The analysed timeframe (e.g. `1h`) — used to render binary-options expiry times. */
+  interval: string;
+  /** The venue this run targeted; `undefined`/spot venues show TP/SL, binary-options show an expiry time. */
+  exchange?: string;
 }
 
 export type ProgressListener = (event: ProgressEvent) => void;
@@ -169,7 +175,7 @@ export class CollectionPipeline {
     if (!options.skipAiValidation && hasAiKey && reports.length > 0) {
       emit({ phase: 'advise', message: 'Running AI validation across all symbols…' });
 
-      const forecasts = reports.map((r) => buildForecast(r.analysis));
+      const forecasts = reports.map((r) => buildForecast(r.analysis, { interval }));
       const newsConsensus = await this.store.getNewsConsensus(30);
       const allAnalyses = reports.map((r) => r.analysis);
 
@@ -199,6 +205,15 @@ export class CollectionPipeline {
     await this.store.finishRun(runId, 'completed');
     emit({ phase: 'done', message: `Run #${runId} completed for ${symbols.length} symbol(s)` });
 
-    return { runId, kind, symbols: reports, searchResults: searchCount, durationMs: Date.now() - started, validation };
+    return {
+      runId,
+      kind,
+      symbols: reports,
+      searchResults: searchCount,
+      durationMs: Date.now() - started,
+      validation,
+      interval,
+      exchange: options.exchange,
+    };
   }
 }

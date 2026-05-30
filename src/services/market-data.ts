@@ -224,6 +224,38 @@ export class OkxMarketData implements MarketDataSource {
 }
 
 /**
+ * Forex rates for the Pocket Option binary-options platform, sourced from the
+ * public Frankfurter API (https://frankfurter.dev). Frankfurter exposes ECB
+ * reference rates as a single spot quote per pair (no OHLCV), so — like the
+ * CoinGecko adapter — this source builds a short, deterministic candle path that
+ * lands exactly on the fetched rate. That keeps every strategy working unchanged
+ * while the symbols become forex pairs such as `EURUSD`.
+ *
+ * Pocket Option is a binary-options venue: there are no take-profit or
+ * stop-loss orders, only a directional bet with an expiry time. The price feed
+ * here is purely what the strategies analyse; the expiry is derived in
+ * {@link ../strategies/forecast.buildForecast}.
+ */
+export class FrankfurterMarketData implements MarketDataSource {
+  readonly name = 'pocketoption';
+
+  constructor(private readonly baseUrl = process.env.TRADEFAST_FRANKFURTER_API ?? 'https://api.frankfurter.dev') {}
+
+  async getCandles(symbol: string, interval: string, limit: number): Promise<Candle[]> {
+    const { base, quote } = toForexPair(symbol);
+    const url = `${this.baseUrl}/v2/rate/${base}/${quote}`;
+    const res = await fetch(url, { signal: AbortSignal.timeout(10_000) });
+    if (!res.ok) throw new Error(`Frankfurter responded ${res.status}`);
+    const json = (await res.json()) as { rates?: Record<string, number> };
+    const rate = Number(json.rates?.[quote]);
+    if (!Number.isFinite(rate) || rate <= 0) {
+      throw new Error(`Frankfurter returned no ${base}/${quote} rate`);
+    }
+    return candlesFromSpot(symbol, interval, limit, rate);
+  }
+}
+
+/**
  * Deterministic synthetic candles for offline use and tests. The series is
  * reproducible from `symbol` so the same input always yields the same data —
  * useful for snapshot-style verification.
@@ -269,6 +301,22 @@ function intervalMinutes(interval: string): number {
 
 function baseAsset(symbol: string): string {
   return symbol.toUpperCase().replace(/(USDT|USDC|USD)$/u, '');
+}
+
+/**
+ * Splits a 6-letter forex pair such as `EURUSD` into its base and quote ISO
+ * codes (`EUR`, `USD`). Pocket Option trades currency pairs, so a crypto-style
+ * ticker like `BTCUSDT` is rejected with a clear message.
+ */
+export function toForexPair(symbol: string): { base: string; quote: string } {
+  const cleaned = symbol.toUpperCase().replace(/[^A-Z]/g, '');
+  if (cleaned.length !== 6) {
+    throw new Error(
+      `Pocket Option expects a 6-letter forex pair like EURUSD, got "${symbol}". ` +
+      `Set TRADEFAST_SYMBOLS to forex pairs (EURUSD,GBPUSD,…).`,
+    );
+  }
+  return { base: cleaned.slice(0, 3), quote: cleaned.slice(3, 6) };
 }
 
 function coinGeckoId(symbol: string): string {
@@ -367,13 +415,17 @@ export { MexcMarketData as MexcTickerMarketData };
  *   - `resilient` (default) → live with synthetic fallback.
  */
 export function createMarketSource(): MarketDataSource {
-  switch ((process.env.TRADEFAST_MARKET_SOURCE ?? 'resilient').toLowerCase()) {
+  switch ((process.env.TRADEFAST_MARKET_SOURCE ?? 'resilient').toLowerCase().replace(/[\s_-]+/g, '')) {
     case 'synthetic':
       return new SyntheticMarketData();
     case 'coingecko':
       return new CoinGeckoMarketData();
     case 'mexc':
       return new MexcMarketData();
+    case 'frankfurter':
+    case 'forex':
+    case 'pocketoption':
+      return new FrankfurterMarketData();
     case 'binance':
     case 'live':
       return new BinanceMarketData();
@@ -399,14 +451,16 @@ export function withPriceValidation(source: MarketDataSource): MarketDataSource 
 }
 
 /**
- * Creates a live market data source for the given exchange (Binance, Bybit, OKX, MEXC).
+ * Creates a live market data source for the given exchange (Binance, Bybit, OKX,
+ * MEXC, or Pocket Option forex via Frankfurter).
  * Falls back to Binance if unknown. This is the preferred way when the user has
  * selected an exchange via /exchange or TRADEFAST_EXCHANGE.
  *
  * Prices are validated against realistic floors after every fetch.
  */
 export function createMarketSourceFor(exchange?: ExchangeName | string): MarketDataSource {
-  const ex = (exchange ?? 'binance').toLowerCase();
+  // Strip separators so loose spellings (pocket-option, Pocket_Option) still resolve.
+  const ex = (exchange ?? 'binance').toLowerCase().replace(/[\s_-]+/g, '');
   const inner = (() => {
     switch (ex) {
       case 'bybit':
@@ -415,6 +469,8 @@ export function createMarketSourceFor(exchange?: ExchangeName | string): MarketD
         return new OkxMarketData();
       case 'mexc':
         return new MexcMarketData();
+      case 'pocketoption':
+        return new FrankfurterMarketData();
       case 'binance':
       default:
         return new BinanceMarketData();

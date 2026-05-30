@@ -1,7 +1,8 @@
 import { createDb, type DbHandle } from '../db/client.js';
 import { TradefastStore } from '../db/store.js';
 import type { AnalyticsRow } from '../db/store.js';
-import { loadConfig, type TradefastConfig } from '../config.js';
+import { loadConfig, defaultSymbolsForExchange, type TradefastConfig } from '../config.js';
+import { isBinaryOptions } from '../cli/exchanges.js';
 import type { Candle } from '../domain/candle.js';
 import { CollectionPipeline, type CollectOptions, type ProgressListener, type RunReport } from '../pipeline/collector.js';
 import {
@@ -86,6 +87,17 @@ export class Tradefast {
    *  Called by the interactive CLI when the user runs /exchange at runtime.
    */
   setExchange(name: string): void {
+    // When the user has not pinned a custom universe (their symbols still match
+    // the previous venue's defaults), follow the venue: switching to Pocket
+    // Option swaps crypto tickers for forex pairs and vice-versa. A customised
+    // list is left untouched.
+    const previousDefaults = defaultSymbolsForExchange(this.config.exchange);
+    const onDefaults =
+      this.config.symbols.length === previousDefaults.length &&
+      this.config.symbols.every((s, i) => s === previousDefaults[i]);
+    if (onDefaults) {
+      (this.config as any).symbols = defaultSymbolsForExchange(name);
+    }
     (this.config as any).exchange = name;
     this.market = createResilientMarketSourceFor(name);
     this.pipeline = new CollectionPipeline(this.store, this.market);
@@ -116,6 +128,7 @@ export class Tradefast {
         interval: this.config.interval,
         limit: this.config.candleLimit,
         accountBalance: this.config.accountBalance,
+        exchange: this.config.exchange,
         ...extra,
       },
       onProgress,
@@ -131,6 +144,7 @@ export class Tradefast {
         interval: this.config.interval,
         limit: this.config.candleLimit,
         accountBalance: this.config.accountBalance,
+        exchange: this.config.exchange,
         ...extra,
       },
       onProgress,
@@ -150,6 +164,7 @@ export class Tradefast {
     const interval = this.config.interval;
     const limit = this.config.candleLimit;
     const symbols = this.config.symbols;
+    const binary = isBinaryOptions(this.config.exchange);
     const results: BacktestResult[] = [];
 
     let step = 0;
@@ -161,6 +176,7 @@ export class Tradefast {
           warmup: options.warmup,
           horizon: options.horizon,
           accountBalance: this.config.accountBalance,
+          binary,
         }),
       );
     }
@@ -177,6 +193,7 @@ export class Tradefast {
         interval: this.config.interval,
         limit: this.config.candleLimit,
         accountBalance: this.config.accountBalance,
+        exchange: this.config.exchange,
         ...extra,
       },
       onProgress,

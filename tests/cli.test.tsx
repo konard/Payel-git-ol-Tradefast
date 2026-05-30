@@ -7,7 +7,7 @@ import { App } from '../src/cli/App.js';
 import { completeCommand, parseCommand, suggestCommands } from '../src/cli/commands.js';
 import { OutputLine } from '../src/cli/output.js';
 import { getTheme, themeNames } from '../src/cli/theme.js';
-import { getExchange, exchangeNames, type ExchangeName } from '../src/cli/exchanges.js';
+import { getExchange, exchangeNames, isBinaryOptions, exchangeKind, type ExchangeName } from '../src/cli/exchanges.js';
 import { getMode, modeNames } from '../src/cli/modes.js';
 import { renderBacktestLines } from '../src/cli/backtest-log.js';
 import { renderTradeLogLines } from '../src/cli/trade-log.js';
@@ -275,11 +275,22 @@ describe('cli themes', () => {
 });
 
 describe('cli exchanges', () => {
-  it('lists Binance, OKX, Bybit, MEXC and defaults to bybit', () => {
-    expect(exchangeNames()).toEqual(['binance', 'okx', 'bybit', 'mexc']);
+  it('lists Binance, OKX, Bybit, MEXC, Pocket Option and defaults to bybit', () => {
+    expect(exchangeNames()).toEqual(['binance', 'okx', 'bybit', 'mexc', 'pocketoption']);
     expect(getExchange().name).toBe('bybit');
     expect(getExchange('mexc').label).toBe('MEXC');
     expect(getExchange('unknown').name).toBe('bybit');
+  });
+
+  it('classifies crypto venues as spot and Pocket Option as binary-options', () => {
+    expect(exchangeKind('bybit')).toBe('spot');
+    expect(isBinaryOptions('bybit')).toBe(false);
+    expect(getExchange('pocketoption').label).toBe('Pocket Option');
+    expect(exchangeKind('pocketoption')).toBe('binary-options');
+    expect(isBinaryOptions('pocketoption')).toBe(true);
+    // Tolerates the spaced / hyphenated forms a user might type.
+    expect(isBinaryOptions('Pocket Option')).toBe(true);
+    expect(isBinaryOptions('pocket-option')).toBe(true);
   });
 });
 
@@ -309,6 +320,7 @@ describe('run output', () => {
     searchResults: 3,
     durationMs: 2340,
     validation: null,
+    interval: '1h',
     symbols: [
       {
         symbol: 'BTCUSDT',
@@ -426,6 +438,25 @@ describe('run output', () => {
     };
 
     expect(renderTradeLogLines(noActionReport)).toContain('│ BTCUSDT  │     │    │    │ 100.00 │ Momentum favours longs │');
+  });
+
+  it('shows a binary-options expiry Time column instead of TP/SL for Pocket Option', () => {
+    const binaryReport: RunReport = {
+      ...report,
+      exchange: 'pocketoption',
+      symbols: [{ ...report.symbols[0], symbol: 'EURUSD', assessment: 'Momentum favours longs' }],
+    };
+
+    const lines = renderTradeLogLines(binaryReport);
+    const header = lines.find((l) => l.includes('Currency')) ?? '';
+    // The binary header carries a Time column and drops the spot bracket columns.
+    expect(header).toContain('Time');
+    expect(header).not.toMatch(/\bTP\b/);
+    expect(header).not.toMatch(/\bSL\b/);
+    // 1h analysis → 2 bars × 60 min = 120 min, rendered compactly as 2h.
+    const row = lines.find((l) => l.includes('long')) ?? '';
+    expect(row).toContain('2h');
+    expect(row).not.toContain('110.00');
   });
 });
 
