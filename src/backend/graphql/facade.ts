@@ -1,5 +1,6 @@
 import type { StatusReport } from '../../app/tradefast.js';
 import type { RunReport } from '../../pipeline/collector.js';
+import type { SearchResult } from '../../services/search.js';
 
 /** DI token under which the application facade is provided to the resolver. */
 export const TRADEFAST_FACADE = Symbol('TRADEFAST_FACADE');
@@ -16,4 +17,6 @@ export interface TradefastApiFacade {
   start(): Promise<RunReport>;
   update(): Promise<RunReport>;
   clear(): Promise<number>;
+  /** Whole-internet web search executed server-side. */
+  search(query: string, limit?: number): Promise<SearchResult[]>;
 }

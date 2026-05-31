@@ -1,7 +1,12 @@
 import { Box, Text } from 'ink';
 import React from 'react';
 
-import { sourceGroupIds, getSourceGroup, type SourceGroupId } from '../sources.js';
+import {
+  selectablePlatformIds,
+  getPlatformLabel,
+  getPlatformDescription,
+  type ResearchPlatformId,
+} from '../sources.js';
 import type { CliTheme } from '../theme.js';
 
 export function PlatformSelector({
@@ -11,7 +16,7 @@ export function PlatformSelector({
 }: {
   theme: CliTheme;
   cursorIndex: number;
-  enabledGroups: SourceGroupId[];
+  enabledGroups: ResearchPlatformId[];
 }): React.ReactElement {
   return (
     <Box
@@ -27,8 +32,7 @@ export function PlatformSelector({
       <Text color={theme.colors.muted}>
         Space=toggle, Enter=done, Esc=cancel
       </Text>
-      {sourceGroupIds().map((id, index) => {
-        const group = getSourceGroup(id)!;
+      {selectablePlatformIds().map((id, index) => {
         const checked = enabledGroups.includes(id);
         const focused = index === cursorIndex;
 
@@ -37,9 +41,9 @@ export function PlatformSelector({
             {focused ? '> ' : '  '}
             <Text bold={focused}>{checked ? '[x]' : '[ ]'}</Text>
             {' '}
-            <Text bold={focused && checked}>{group.label}</Text>
+            <Text bold={focused && checked}>{getPlatformLabel(id)}</Text>
             {' '}
-            <Text color={theme.colors.muted}>{group.description}</Text>
+            <Text color={theme.colors.muted}>{getPlatformDescription(id)}</Text>
           </Text>
         );
       })}

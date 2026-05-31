@@ -43,6 +43,9 @@ const facade: TradefastApiFacade = {
     interval: '1h',
   }),
   clear: async () => 1,
+  search: async () => [
+    { query: 'btc', source: 'web-search', title: 'BTC rallies', url: 'https://example.com/btc', snippet: 'up', score: 1 },
+  ],
 };
 
 describe('Nest GraphQL resolver', () => {
@@ -67,6 +70,14 @@ describe('Nest GraphQL resolver', () => {
     await expect(resolver.start()).resolves.toMatchObject({ runId: 2, kind: 'start' });
     await expect(resolver.update()).resolves.toMatchObject({ runId: 3, kind: 'update' });
     await expect(resolver.clear()).resolves.toBe(1);
+  });
+
+  it('runs whole-internet web search server-side via the webSearch query', async () => {
+    const resolver = new TradefastResolver(new TradefastRepository(facade));
+
+    await expect(resolver.webSearch('btc', 5)).resolves.toEqual([
+      { source: 'web-search', title: 'BTC rallies', url: 'https://example.com/btc', snippet: 'up', score: 1 },
+    ]);
   });
 
   it('serves the GraphQL schema over HTTP', async () => {

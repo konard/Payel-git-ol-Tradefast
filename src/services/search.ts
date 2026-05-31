@@ -128,6 +128,39 @@ export class KnowledgeBaseSearch implements SearchProvider {
   }
 }
 
+/**
+ * Fans a query out to several {@link SearchProvider}s and merges their hits into
+ * a single ranked list. This is how whole-internet "Web Search" is layered on
+ * top of the curated {@link KnowledgeBaseSearch} as *additional* support: both
+ * providers run, their results are concatenated, de-duplicated by URL/title and
+ * re-sorted by score. A provider that throws is skipped so one flaky source
+ * never sinks the whole search.
+ */
+export class CompositeSearchProvider implements SearchProvider {
+  readonly name = 'composite';
+  private readonly providers: SearchProvider[];
+
+  constructor(...providers: SearchProvider[]) {
+    this.providers = providers.filter(Boolean);
+  }
+
+  async search(query: string, symbol?: string): Promise<SearchResult[]> {
+    const settled = await Promise.allSettled(this.providers.map((p) => p.search(query, symbol)));
+    const merged: SearchResult[] = [];
+    const seen = new Set<string>();
+    for (const outcome of settled) {
+      if (outcome.status !== 'fulfilled') continue;
+      for (const result of outcome.value) {
+        const key = (result.url ?? result.title).toLowerCase();
+        if (seen.has(key)) continue;
+        seen.add(key);
+        merged.push(result);
+      }
+    }
+    return merged.sort((a, b) => b.score - a.score);
+  }
+}
+
 /** Normalised keyword-overlap relevance in the range [0, 1]. */
 function relevance(entry: KnowledgeEntry, terms: string[]): number {
   if (terms.length === 0) return 0;

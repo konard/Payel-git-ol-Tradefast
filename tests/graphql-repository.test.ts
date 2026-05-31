@@ -56,6 +56,9 @@ const facade: TradefastApiFacade = {
     interval: '1h',
   }),
   clear: async () => 4,
+  search: async (query: string) => [
+    { query, source: 'web-search', title: 'BTC rallies', url: 'https://example.com/btc', snippet: 'up', score: 1 },
+  ],
 };
 
 describe('GraphqlTradefastRepository', () => {
@@ -83,6 +86,11 @@ describe('GraphqlTradefastRepository', () => {
 
       await expect(repository.update()).resolves.toMatchObject({ runId: 3, kind: 'update' });
       await expect(repository.clear()).resolves.toBe(4);
+
+      const hits = await repository.webSearch('btc', 5);
+      expect(hits).toEqual([
+        { source: 'web-search', title: 'BTC rallies', url: 'https://example.com/btc', snippet: 'up', score: 1 },
+      ]);
     } finally {
       await backend.close();
     }

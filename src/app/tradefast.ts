@@ -21,6 +21,9 @@ import {
 import { ALL_STRATEGIES } from '../strategies/registry.js';
 import { computeCrowdConsensus, type InstrumentConsensus } from '../services/news-consensus.js';
 import { SourceRatingService } from '../services/source-ratings.js';
+import { isWebSearchEnabled } from '../cli/sources.js';
+import { createWebSearchProvider } from '../services/web-search.js';
+import type { SearchResult } from '../services/search.js';
 
 export interface StatusReport {
   driver: string;
@@ -107,6 +110,19 @@ export class Tradefast {
     (this.config as any).interval = interval;
   }
 
+  /** Updates the enabled research platforms (used by the `/serching-platforms`
+   *  selector). The "Web Search" toggle here drives whether subsequent /start,
+   *  /update and /currency runs search the whole Internet in addition to the
+   *  curated knowledge base. */
+  setSearchingPlatforms(platforms: readonly string[]): void {
+    (this.config as any).searchingPlatforms = [...platforms];
+  }
+
+  /** Whether whole-internet web search is currently enabled in the config. */
+  private get webSearchEnabled(): boolean {
+    return isWebSearchEnabled(this.config.searchingPlatforms ?? []);
+  }
+
   /** Records the active operating mode (trading style). The associated timeframe
    *  is applied separately via {@link setInterval} so analysis actually shifts
    *  to the chosen horizon. */
@@ -129,6 +145,7 @@ export class Tradefast {
         limit: this.config.candleLimit,
         accountBalance: this.config.accountBalance,
         exchange: this.config.exchange,
+        webSearch: this.webSearchEnabled,
         ...extra,
       },
       onProgress,
@@ -145,6 +162,7 @@ export class Tradefast {
         limit: this.config.candleLimit,
         accountBalance: this.config.accountBalance,
         exchange: this.config.exchange,
+        webSearch: this.webSearchEnabled,
         ...extra,
       },
       onProgress,
@@ -194,6 +212,7 @@ export class Tradefast {
         limit: this.config.candleLimit,
         accountBalance: this.config.accountBalance,
         exchange: this.config.exchange,
+        webSearch: this.webSearchEnabled,
         ...extra,
       },
       onProgress,
@@ -213,6 +232,18 @@ export class Tradefast {
     const candles = await this.store.getCandles(symbol, this.config.interval);
 
     return { symbol, report, price, newsConsensus: currencyNews, candles };
+  }
+
+  /**
+   * Whole-internet web search exposed for the backend `webSearch` GraphQL query.
+   * Runs server-side through the Playwright/HTTP {@link WebSearchProvider} so the
+   * CLI can search the entire Internet, not just the curated sources. Returns an
+   * empty list on failure rather than throwing.
+   */
+  async search(query: string, limit = 10): Promise<SearchResult[]> {
+    const provider = createWebSearchProvider({ limit });
+    const results = await provider.search(query);
+    return results.slice(0, limit);
   }
 
   /** Read back persisted candles for chart rendering. */

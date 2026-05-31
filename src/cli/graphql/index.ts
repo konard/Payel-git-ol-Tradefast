@@ -7,3 +7,4 @@ export type { Strategy } from './strategy.js';
 export type { SymbolRun } from './symbol-run.js';
 export type { RunReport } from './run-report.js';
 export type { TableCount } from './table-count.js';
+export type { WebSearchHit } from './web-search.js';

@@ -2,6 +2,7 @@ import { Inject, Injectable } from '@nestjs/common';
 
 import type { RunReport } from '../../pipeline/collector.js';
 import { RunReportDto } from './dto/run-report.dto.js';
+import { SearchResultDto } from './dto/search-result.dto.js';
 import { StatusDto } from './dto/status.dto.js';
 import { StrategyDto } from './dto/strategy.dto.js';
 import { TRADEFAST_FACADE, type TradefastApiFacade } from './facade.js';
@@ -51,6 +52,17 @@ export class TradefastRepository {
 
   clear(): Promise<number> {
     return this.tradefast.clear();
+  }
+
+  async webSearch(query: string, limit?: number): Promise<SearchResultDto[]> {
+    const results = await this.tradefast.search(query, limit);
+    return results.map((result) => ({
+      source: result.source,
+      title: result.title,
+      url: result.url ?? null,
+      snippet: result.snippet ?? null,
+      score: result.score,
+    }));
   }
 }
 

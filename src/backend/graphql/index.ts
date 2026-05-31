@@ -2,6 +2,7 @@
 export { TRADEFAST_FACADE, type TradefastApiFacade } from './facade.js';
 export { AnalyticsDto } from './dto/analytics.dto.js';
 export { RunReportDto } from './dto/run-report.dto.js';
+export { SearchResultDto } from './dto/search-result.dto.js';
 export { StatusDto } from './dto/status.dto.js';
 export { StrategyDto } from './dto/strategy.dto.js';
 export { SymbolRunDto } from './dto/symbol-run.dto.js';

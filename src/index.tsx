@@ -17,7 +17,7 @@ import { getExchange, exchangeNames, type ExchangeName } from './cli/exchanges.j
 import { getInterval, intervalNames } from './cli/intervals.js';
 import { getMode, modeNames, type ModeName } from './cli/modes.js';
 import { getSearchLevel, searchLevelNames, type SearchLevelName } from './cli/search-level.js';
-import { sourceGroupIds, resolveSourceIds, type SourceGroupId } from './cli/sources.js';
+import { resolveSourceIds, selectablePlatformIds, type ResearchPlatformId } from './cli/sources.js';
 import { loadPreferences, saveTheme, saveExchange, saveInterval, saveMode, saveSearchingLevel, saveSearchingPlatforms } from './cli/preferences.js';
 import { renderBacktestLines } from './cli/backtest-log.js';
 import { renderTradeLogLines } from './cli/trade-log.js';
@@ -123,16 +123,17 @@ async function runHeadless(command: string): Promise<number> {
   if (name === 'serching-platforms') {
     if (args.length > 0) {
       const groups = args[0].split(',').map((s) => s.trim()).filter(Boolean);
-      const valid = groups.filter((g) => sourceGroupIds().includes(g as SourceGroupId));
+      const selectable = selectablePlatformIds() as string[];
+      const valid = groups.filter((g) => selectable.includes(g)) as ResearchPlatformId[];
       if (valid.length === 0) {
-        process.stderr.write(`No valid platform groups. Available: ${sourceGroupIds().join(', ')}\n`);
+        process.stderr.write(`No valid platforms. Available: ${selectablePlatformIds().join(', ')}\n`);
         return 1;
       }
-      await saveSearchingPlatforms(valid as SourceGroupId[]);
-      const count = resolveSourceIds(valid as SourceGroupId[]).length;
+      await saveSearchingPlatforms(valid);
+      const count = resolveSourceIds(valid).length;
       process.stdout.write(`Research platforms: ${valid.join(', ')} (${count} sources)\n`);
     } else {
-      process.stdout.write(`Platform groups: ${sourceGroupIds().join(', ')}\n`);
+      process.stdout.write(`Platforms: ${selectablePlatformIds().join(', ')}\n`);
     }
     return 0;
   }

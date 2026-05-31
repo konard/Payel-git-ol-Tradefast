@@ -3,6 +3,7 @@ import { GraphqlClient } from './client.js';
 import { START_MUTATION, UPDATE_MUTATION, type RunReport, type StartResult, type UpdateResult } from './run-report.js';
 import { STATUS_QUERY, type Status, type StatusResult } from './status.js';
 import { STRATEGIES_QUERY, type Strategy, type StrategiesResult } from './strategy.js';
+import { WEB_SEARCH_QUERY, type WebSearchHit, type WebSearchResult } from './web-search.js';
 
 /**
  * The frontend repository. Every API request the CLI makes goes through this
@@ -40,5 +41,10 @@ export class GraphqlTradefastRepository {
   async clear(): Promise<number> {
     const data = await this.client.request<ClearResult>(CLEAR_MUTATION);
     return data.clear;
+  }
+
+  async webSearch(query: string, limit?: number): Promise<WebSearchHit[]> {
+    const data = await this.client.request<WebSearchResult>(WEB_SEARCH_QUERY, { query, limit });
+    return data.webSearch;
   }
 }

@@ -7,7 +7,7 @@ import type { ThemeName } from './theme.js';
 import type { ExchangeName } from './exchanges.js';
 import type { ModeName } from './modes.js';
 import type { SearchLevelName } from './search-level.js';
-import type { SourceGroupId } from './sources.js';
+import type { ResearchPlatformId } from './sources.js';
 
 const PREF_PATH = join(homedir(), '.tradefast', 'preferences.json');
 
@@ -17,7 +17,7 @@ export interface UserPreferences {
   interval?: IntervalName;
   mode?: ModeName;
   searchingLevel?: SearchLevelName;
-  searchingPlatforms?: SourceGroupId[];
+  searchingPlatforms?: ResearchPlatformId[];
 }
 
 export async function loadPreferences(): Promise<UserPreferences> {
@@ -57,6 +57,6 @@ export async function saveSearchingLevel(name: SearchLevelName): Promise<void> {
   await savePreferences({ searchingLevel: name });
 }
 
-export async function saveSearchingPlatforms(groups: SourceGroupId[]): Promise<void> {
+export async function saveSearchingPlatforms(groups: ResearchPlatformId[]): Promise<void> {
   await savePreferences({ searchingPlatforms: groups });
 }

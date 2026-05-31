@@ -117,12 +117,16 @@ export function getSourceGroup(id: string): SourceGroup | undefined {
   return SOURCE_GROUPS.find((g) => g.id === id);
 }
 
-/** All enabled source IDs from the enabled group IDs. */
+/**
+ * All enabled news source IDs from the enabled platforms. Non-group platforms
+ * (e.g. `web-search`) contribute no curated source IDs and are simply ignored
+ * here — they are fulfilled by their own provider, not the news crawler.
+ */
 export function resolveSourceIds(
-  enabledGroups: SourceGroupId[],
+  enabledGroups: readonly string[],
 ): string[] {
   return SOURCE_GROUPS
-    .filter((g) => enabledGroups.includes(g.id as SourceGroupId))
+    .filter((g) => enabledGroups.includes(g.id))
     .flatMap((g) => g.sourceIds);
 }
 
@@ -134,4 +138,51 @@ export const DEFAULT_ENABLED_GROUPS: SourceGroupId[] = [
   'reddit-communities',
   'crypto-communities',
   'exchange-communities',
+];
+
+/**
+ * The identifier of the whole-internet web search. It is intentionally NOT a
+ * {@link SourceGroup}: it has no curated `sourceIds` and is fulfilled by the
+ * Playwright/HTTP {@link WebSearchProvider} rather than the news crawler. Keeping
+ * it separate preserves the strict news-group contract while still letting the
+ * selector and config treat it as one more toggleable platform.
+ */
+export const WEB_SEARCH_PLATFORM_ID = 'web-search' as const;
+
+/** A research platform shown in `/serching-platforms`: a news group or web search. */
+export type ResearchPlatformId = SourceGroupId | typeof WEB_SEARCH_PLATFORM_ID;
+
+const WEB_SEARCH_PLATFORM = {
+  id: WEB_SEARCH_PLATFORM_ID,
+  label: 'Web Search',
+  description: 'Search the entire Internet (Google via Playwright, DuckDuckGo HTML fallback)',
+} as const;
+
+/** Every platform the selector offers: the news groups followed by web search. */
+export const selectablePlatformIds = (): ResearchPlatformId[] => [
+  ...sourceGroupIds(),
+  WEB_SEARCH_PLATFORM_ID,
+];
+
+/** The display label for any platform id (news group or web search). */
+export function getPlatformLabel(id: ResearchPlatformId): string {
+  if (id === WEB_SEARCH_PLATFORM_ID) return WEB_SEARCH_PLATFORM.label;
+  return getSourceGroup(id)?.label ?? id;
+}
+
+/** The description line for any platform id (news group or web search). */
+export function getPlatformDescription(id: ResearchPlatformId): string {
+  if (id === WEB_SEARCH_PLATFORM_ID) return WEB_SEARCH_PLATFORM.description;
+  return getSourceGroup(id)?.description ?? '';
+}
+
+/** Whether whole-internet web search is among the enabled platforms. */
+export function isWebSearchEnabled(platforms: readonly string[]): boolean {
+  return platforms.includes(WEB_SEARCH_PLATFORM_ID);
+}
+
+/** Default-enabled platforms: every news group plus whole-internet web search. */
+export const DEFAULT_ENABLED_PLATFORMS: ResearchPlatformId[] = [
+  ...DEFAULT_ENABLED_GROUPS,
+  WEB_SEARCH_PLATFORM_ID,
 ];

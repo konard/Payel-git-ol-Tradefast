@@ -22,7 +22,13 @@ import { getExchange, exchangeNames, isKnownExchange, isBinaryOptions, type Exch
 import { getInterval, intervalNames, type IntervalName } from './intervals.js';
 import { getMode, modeNames, type ModeName } from './modes.js';
 import { searchLevelNames, getSearchLevel, type SearchLevelName } from './search-level.js';
-import { sourceGroupIds, getSourceGroup, resolveSourceIds, DEFAULT_ENABLED_GROUPS, type SourceGroupId } from './sources.js';
+import {
+  resolveSourceIds,
+  selectablePlatformIds,
+  getPlatformLabel,
+  DEFAULT_ENABLED_PLATFORMS,
+  type ResearchPlatformId,
+} from './sources.js';
 
 export interface AppProps {
   app: Tradefast;
@@ -65,14 +71,15 @@ export function App({ app, version, apiUrl, promptOperatingMode }: AppProps): Re
   const [searchingLevel, setSearchingLevel] = useState<SearchLevelName>(() => getSearchLevel(app.config.searchingLevel).name as SearchLevelName);
   const [platformSelectorOpen, setPlatformSelectorOpen] = useState(false);
   const [platformCursorIndex, setPlatformCursorIndex] = useState(0);
-  const [enabledPlatforms, setEnabledPlatforms] = useState<SourceGroupId[]>(() => {
+  const [enabledPlatforms, setEnabledPlatforms] = useState<ResearchPlatformId[]>(() => {
     if (Array.isArray(app.config.searchingPlatforms) && app.config.searchingPlatforms.length > 0) {
-      const valid = app.config.searchingPlatforms.filter((g): g is SourceGroupId =>
-        (sourceGroupIds() as string[]).includes(g),
+      const selectable = selectablePlatformIds() as string[];
+      const valid = app.config.searchingPlatforms.filter((g): g is ResearchPlatformId =>
+        selectable.includes(g),
       );
-      return valid.length > 0 ? valid : [...DEFAULT_ENABLED_GROUPS];
+      return valid.length > 0 ? valid : [...DEFAULT_ENABLED_PLATFORMS];
     }
-    return [...DEFAULT_ENABLED_GROUPS];
+    return [...DEFAULT_ENABLED_PLATFORMS];
   });
   const [busy, setBusy] = useState(false);
   const newsCrawlOptions = useCallback(
@@ -214,7 +221,7 @@ export function App({ app, version, apiUrl, promptOperatingMode }: AppProps): Re
   );
 
   const togglePlatform = useCallback(
-    (id: SourceGroupId) => {
+    (id: ResearchPlatformId) => {
       setEnabledPlatforms((prev) =>
         prev.includes(id) ? prev.filter((g) => g !== id) : [...prev, id],
       );
@@ -226,11 +233,12 @@ export function App({ app, version, apiUrl, promptOperatingMode }: AppProps): Re
     () => {
       setPlatformSelectorOpen(false);
       void saveSearchingPlatforms(enabledPlatforms);
+      app.setSearchingPlatforms(enabledPlatforms);
       const count = resolveSourceIds(enabledPlatforms).length;
-      const groups = enabledPlatforms.map((id) => getSourceGroup(id)?.label ?? id).join(', ');
+      const groups = enabledPlatforms.map((id) => getPlatformLabel(id)).join(', ');
       push({ kind: 'text', text: `Research platforms: ${groups} (${count} sources)`, color: theme.colors.info });
     },
-    [enabledPlatforms, push, theme],
+    [app, enabledPlatforms, push, theme],
   );
 
   const applyCurrency = useCallback(
@@ -355,13 +363,13 @@ export function App({ app, version, apiUrl, promptOperatingMode }: AppProps): Re
       if (key.escape) {
         setPlatformSelectorOpen(false);
       } else if (key.upArrow) {
-        setPlatformCursorIndex((index) => (index - 1 + sourceGroupIds().length) % sourceGroupIds().length);
+        setPlatformCursorIndex((index) => (index - 1 + selectablePlatformIds().length) % selectablePlatformIds().length);
       } else if (key.downArrow) {
-        setPlatformCursorIndex((index) => (index + 1) % sourceGroupIds().length);
+        setPlatformCursorIndex((index) => (index + 1) % selectablePlatformIds().length);
       } else if (key.return) {
         applyPlatforms();
       } else if (_input === ' ') {
-        togglePlatform(sourceGroupIds()[platformCursorIndex]);
+        togglePlatform(selectablePlatformIds()[platformCursorIndex]);
       }
       return;
     }
@@ -505,7 +513,7 @@ export function App({ app, version, apiUrl, promptOperatingMode }: AppProps): Re
           return;
         }
         if (args[0] === 'check') {
-          const groups = enabledPlatforms.map((id) => getSourceGroup(id)?.label ?? id).join(', ');
+          const groups = enabledPlatforms.map((id) => getPlatformLabel(id)).join(', ');
           const count = resolveSourceIds(enabledPlatforms).length;
           push({ kind: 'text', text: `Research platforms: ${groups} (${count} sources)`, color: theme.colors.info });
           return;
@@ -747,12 +755,14 @@ export function App({ app, version, apiUrl, promptOperatingMode }: AppProps): Re
               case 'run_serching_platforms': {
                 const groups = toolArgs.groups as string[] | undefined;
                 if (groups && Array.isArray(groups) && groups.length > 0) {
-                  const valid = groups.filter((g) => sourceGroupIds().includes(g as SourceGroupId));
+                  const selectable = selectablePlatformIds() as string[];
+                  const valid = groups.filter((g) => selectable.includes(g)) as ResearchPlatformId[];
                   if (valid.length > 0) {
-                    setEnabledPlatforms(valid as SourceGroupId[]);
-                    void saveSearchingPlatforms(valid as SourceGroupId[]);
-                    const count = resolveSourceIds(valid as SourceGroupId[]).length;
-                    return `Research platforms set to ${valid.length} group(s) (${count} sources).`;
+                    setEnabledPlatforms(valid);
+                    void saveSearchingPlatforms(valid);
+                    app.setSearchingPlatforms(valid);
+                    const count = resolveSourceIds(valid).length;
+                    return `Research platforms set to ${valid.length} platform(s) (${count} sources).`;
                   }
                 }
                 setPlatformCursorIndex(0);

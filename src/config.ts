@@ -73,7 +73,7 @@ export function loadConfig(overrides: Partial<TradefastConfig> = {}): TradefastC
     searchingPlatforms: overrides.searchingPlatforms ?? (
       process.env.TRADEFAST_SEARCHING_PLATFORMS
         ? process.env.TRADEFAST_SEARCHING_PLATFORMS.split(',').map(s => s.trim()).filter(Boolean)
-        : ['economic-calendars', 'news-portals', 'reddit-communities', 'exchange-communities']
+        : ['economic-calendars', 'news-portals', 'reddit-communities', 'exchange-communities', 'web-search']
     ),
     apiEnabled: overrides.apiEnabled ?? envFlag('TRADEFAST_API', true),
     apiHost: overrides.apiHost ?? process.env.TRADEFAST_API_HOST ?? '127.0.0.1',

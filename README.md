@@ -24,6 +24,12 @@ interactive terminal UI.
   Normal (fast) to Max (full comment graph), persisted across sessions.
 - **Selectable research platforms**: `/serching-platforms` lets you toggle source
   groups on/off — skip Reddit, use only calendars, or go all-in.
+- **Whole-internet Web Search**: a `Web Search` platform (in the same
+  `/serching-platforms` pop-up) layers a Google web search — modelled on
+  [web-agent-master/google-search](https://github.com/web-agent-master/google-search)
+  and scraped with Playwright, with a DuckDuckGo HTML fallback — *on top of* the
+  curated sources, so research is no longer limited to the built-in feeds. The
+  search runs **server-side** through the GraphQL `webSearch` query.
 - **Reddit-specific extraction**: specialized parser follows comment-thread links
   to other Reddit posts and external articles.
 - **13 strategies** computed from textbook technical indicators (SMA, EMA, RSI,
@@ -72,7 +78,8 @@ interactive terminal UI.
   facade onto GraphQL DTOs, and the frontend `GraphqlTradefastRepository`
   (`src/cli/graphql/`) is the only place the CLI talks to the API. Each GraphQL
   class lives in its own file on both sides. The headless `status`, `strategies`
-  and `clear` commands make their requests through this path.
+  and `clear` commands make their requests through this path, as does the
+  whole-internet `webSearch` query so web search executes server-side.
 - **Dockerised**: `docker compose up` brings up PostgreSQL and the CLI.
 
 ---
@@ -129,7 +136,7 @@ TRADEFAST_MARKET_SOURCE=synthetic TRADEFAST_DATA_DIR=:memory: node dist/index.js
 | `/operating-mode [name]` | Open the trading-style selector pop-up, or switch directly by name (`long-term`, `medium-term`, `scalping`). Applies that horizon's timeframe. |
 | `/operating-mode-time [tf]` | Open the timeframe selector, or set it directly (`1m`–`1d`) to fine-tune within the current mode. |
 | `/serching-level [level]` | Set crawl depth/resolution: `normal` (fast, depth 2), `high` (deep, depth 4), or `max` (full graph, depth 8 with comment traversal). Opens a pop-up without argument. |
-| `/serching-platforms` | Toggle source groups on/off: economic calendars, news portals, crypto news, Reddit communities, crypto communities, exchange communities. Opens a multi-select pop-up. |
+| `/serching-platforms` | Toggle research platforms on/off: economic calendars, news portals, crypto news, Reddit communities, crypto communities, exchange communities, plus **Web Search** (whole-internet Google/DuckDuckGo). Opens a multi-select pop-up. |
 | `/currency [symbol]` | Run a full forecast for a single symbol with news sentiment and price chart. |
 | `/exchange [name]` | Switch the venue/data source: `binance`, `okx`, `bybit`, `mexc` (crypto spot) or `pocketoption` (forex binary options). Pocket Option swaps in forex majors and renders an expiry **Time** column instead of TP/SL. Opens a pop-up without an argument. |
 | `/ratings` | Show source credibility ratings. Subcommands: `correct`, `incorrect`, `loud-claim`, or a numeric grade (`/ratings "Хабр" -1`). |
@@ -294,7 +301,7 @@ All configuration is environment-driven (see `.env.example`):
 | `TRADEFAST_AI_MODEL`       | `claude-4.7-opus`             | Model for per-symbol advice and cross-symbol correction.        |
 | `TRADEFAST_SKIP_AI_VALIDATION` | `0`                        | Set to `1` to skip the cross-symbol AI correction step.        |
 | `TRADEFAST_SEARCHING_LEVEL`| _(unset → pop-up)_           | Preset depth: `normal`, `high`, or `max`. Skips the pop-up.     |
-| `TRADEFAST_SEARCHING_PLATFORMS` | _(unset → pop-up)_      | Comma-separated source groups to enable (e.g. `news-portals,reddit-communities`). Skips the pop-up. |
+| `TRADEFAST_SEARCHING_PLATFORMS` | _(unset → pop-up)_      | Comma-separated platforms to enable (e.g. `news-portals,reddit-communities,web-search`). Add `web-search` for whole-internet search. Skips the pop-up. |
 
 The market source falls back gracefully: `resilient` uses live Binance data and
 transparently switches to deterministic synthetic candles if the network is
@@ -343,6 +350,13 @@ limit. Sources are grouped into 6 platform groups:
 | `reddit-communities`   | 10 finance/market subreddits (economy, Finance, stocks, investing, wallstreetbets, StockMarket, Forex, CryptoCurrency, econ, FinancialNews) — kind: `reddit`. |
 | `crypto-communities`   | 6 crypto subreddits (Bitcoin, ethereum, CryptoMarkets, defi, Altcoin, CryptoTechnology) — kind: `reddit`. |
 | `exchange-communities` | Binance, Bybit, OKX, MEXC blogs + their subreddits.                     |
+
+Beyond these curated groups, the **`web-search`** platform adds a whole-internet
+Google web search (DuckDuckGo HTML fallback) that runs server-side via the
+GraphQL `webSearch` query, so `/start`, `/update` and `/currency` can pull in
+results from outside the configured feeds. It is **not** a news group — it has no
+curated `sources.json` entry — so it appears in `/serching-platforms` as its own
+toggle and contributes results to the general search table alongside the crawl.
 
 Sources with `kind: "reddit"` use a specialized extractor that reads Reddit
 threads, extracts the self-text/comments, and follows comment-thread links to
@@ -425,9 +439,10 @@ exposes these tools to the AI:
 - **`run_serching_level`** — sets crawl depth/resolution. The AI can request
   `normal` (fast, shallow), `high` (deep), or `max` (exhaustive) depending on
   how much context it needs.
-- **`run_serching_platforms`** — enables/disables source groups. The AI can
+- **`run_serching_platforms`** — enables/disables research platforms. The AI can
   toggle specific groups (e.g. enable only `economic-calendars` for
-  fundamentals) to tailor research scope.
+  fundamentals) or the whole-internet `web-search` platform to tailor research
+  scope.
 - **`run_ratings_adjust`** — modifies a source's credibility rating. Parameters:
   `source` (title or ID) and `grade` (integer, e.g. `-1` = −1%). Triggered by
   user feedback like *"Хабр -1"* or *"понизь рейтинг Хабру"*.

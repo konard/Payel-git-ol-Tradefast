@@ -4,7 +4,8 @@ import { AnalyticsService, type SymbolAnalysis } from '../services/analytics.js'
 import { createAdvisor, type AiAdvisor, ValidationAdvisor, type ValidationResult } from '../services/ai-advisor.js';
 import { createResilientMarketSourceFor, type MarketDataSource } from '../services/market-data.js';
 import { createScraper, type Scraper } from '../services/scraping.js';
-import { KnowledgeBaseSearch, type SearchProvider } from '../services/search.js';
+import { CompositeSearchProvider, KnowledgeBaseSearch, type SearchProvider } from '../services/search.js';
+import { createWebSearchProvider } from '../services/web-search.js';
 import { buildForecast } from '../strategies/forecast.js';
 
 export interface CollectOptions {
@@ -17,6 +18,12 @@ export interface CollectOptions {
   exchange?: string;
   /** When true, skip the extra AI validation API call (used when AI chat runs the command itself). */
   skipAiValidation?: boolean;
+  /**
+   * When true, layer whole-internet web search on top of the curated knowledge
+   * base for each symbol (the `/serching-platforms` "Web Search" toggle). Runs
+   * server-side via the {@link WebSearchProvider}.
+   */
+  webSearch?: boolean;
 }
 
 /** A single human-readable progress step, streamed to the UI as work proceeds. */
@@ -75,6 +82,12 @@ export class CollectionPipeline {
     private readonly search: SearchProvider = new KnowledgeBaseSearch(),
     private readonly advisor: AiAdvisor = createAdvisor(),
     private readonly scraper: Scraper | null = createScraper(),
+    /**
+     * Whole-internet web search provider, merged with {@link search} when a run
+     * enables `webSearch`. Injectable for tests; lazily created from the
+     * Playwright/HTTP engine when omitted.
+     */
+    private readonly webSearchProvider: SearchProvider | null = null,
   ) {}
 
   async collect(kind: RunKind, options: CollectOptions, onProgress?: ProgressListener): Promise<RunReport> {
@@ -97,6 +110,14 @@ export class CollectionPipeline {
       await this.store.wipeEphemeral();
       emit({ phase: 'wipe', message: 'Cleared previous run data (general search table preserved)' });
     }
+
+    // When the run opts into whole-internet web search, merge it with the
+    // curated knowledge base as *additional* support; otherwise search the
+    // knowledge base alone. The web provider is created lazily so runs that
+    // leave "Web Search" off never touch Playwright.
+    const searchProvider: SearchProvider = options.webSearch
+      ? new CompositeSearchProvider(this.search, this.webSearchProvider ?? createWebSearchProvider())
+      : this.search;
 
     const runId = await this.store.createRun(kind, symbols);
     const reports: SymbolReport[] = [];
@@ -135,7 +156,7 @@ export class CollectionPipeline {
 
       emit({ phase: 'search', symbol, message: `Indexing references for ${symbol}` });
       const query = `${symbol} ${analysis.analytics.strongestStrategy ?? 'trading strategy'}`;
-      const results = await this.search.search(query, symbol);
+      const results = await searchProvider.search(query, symbol);
       for (const r of results) {
         await this.store.saveSearchResult(r);
       }
