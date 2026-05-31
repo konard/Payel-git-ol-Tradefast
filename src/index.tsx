@@ -8,6 +8,7 @@ import { render } from 'ink';
 
 import { Tradefast } from './app/tradefast.js';
 import { startTradefastBackend, type TradefastBackendHandle } from './backend/server.js';
+import { GraphqlTradefastRepository } from './cli/graphql/index.js';
 import { App } from './cli/App.js';
 import { renderBannerArt } from './cli/ascii.js';
 import { COMMANDS, parseCommand } from './cli/commands.js';
@@ -137,7 +138,11 @@ async function runHeadless(command: string): Promise<number> {
   }
   if (name === 'exit') return 0;
 
-  const config = loadConfig(name === 'api' ? { apiEnabled: true } : {});
+  // These commands map cleanly onto the GraphQL API, so the CLI routes them
+  // through the backend (cli → graphql → backend) instead of touching the
+  // application facade directly — the architecture the issue asks for.
+  const viaGraphql = name === 'strategies' || name === 'status' || name === 'clear';
+  const config = loadConfig(name === 'api' || viaGraphql ? { apiEnabled: true } : {});
   const app = await Tradefast.create(config);
   let backend: TradefastBackendHandle | null = null;
   try {
@@ -145,15 +150,19 @@ async function runHeadless(command: string): Promise<number> {
       backend = await startTradefastBackend(app, { host: config.apiHost, port: config.apiPort });
       process.stdout.write(`GraphQL API: ${backend.url}\n`);
       await waitForShutdown();
-    } else if (name === 'strategies') {
-      for (const s of app.strategies()) process.stdout.write(`  ${s.id.padEnd(20)} ${s.title}\n`);
-    } else if (name === 'status') {
-      const status = await app.status();
-      process.stdout.write(`db: ${status.driver}\n`);
-      process.stdout.write(`${Object.entries(status.counts).map(([k, v]) => `${k}=${v}`).join('  ')}\n`);
-    } else if (name === 'clear') {
-      const pruned = await app.clear();
-      process.stdout.write(`Pruned ${pruned} outdated run(s). Search table preserved.\n`);
+    } else if (viaGraphql) {
+      backend = await startTradefastBackend(app, { host: config.apiHost, port: config.apiPort });
+      const repository = new GraphqlTradefastRepository(backend.url);
+      if (name === 'strategies') {
+        for (const s of await repository.strategies()) process.stdout.write(`  ${s.id.padEnd(20)} ${s.title}\n`);
+      } else if (name === 'status') {
+        const status = await repository.status();
+        process.stdout.write(`db: ${status.driver}\n`);
+        process.stdout.write(`${status.counts.map(({ name: k, count: v }) => `${k}=${v}`).join('  ')}\n`);
+      } else {
+        const pruned = await repository.clear();
+        process.stdout.write(`Pruned ${pruned} outdated run(s). Search table preserved.\n`);
+      }
     } else if (name === 'backtest') {
       const report = await app.backtest(reportProgress);
       process.stdout.write(`${renderBacktestLines(report).join('\n')}\n`);

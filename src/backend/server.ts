@@ -5,7 +5,7 @@ import { NestFactory } from '@nestjs/core';
 import { ApolloDriver, type ApolloDriverConfig } from '@nestjs/apollo';
 import { GraphQLModule } from '@nestjs/graphql';
 
-import { TRADEFAST_FACADE, TradefastResolver, type TradefastApiFacade } from './graphql.js';
+import { TRADEFAST_FACADE, TradefastRepository, TradefastResolver, type TradefastApiFacade } from './graphql/index.js';
 
 @Module({})
 class TradefastBackendModule {
@@ -20,7 +20,11 @@ class TradefastBackendModule {
           path: '/graphql',
         }),
       ],
-      providers: [{ provide: TRADEFAST_FACADE, useValue: facade }, TradefastResolver],
+      providers: [
+        { provide: TRADEFAST_FACADE, useValue: facade },
+        TradefastRepository,
+        TradefastResolver,
+      ],
     };
   }
 }

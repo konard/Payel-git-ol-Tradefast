@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 
-import { TradefastResolver, type TradefastApiFacade } from '../src/backend/graphql.js';
+import { TradefastRepository, TradefastResolver, type TradefastApiFacade } from '../src/backend/graphql/index.js';
 import { startTradefastBackend } from '../src/backend/server.js';
 
 const facade: TradefastApiFacade = {
@@ -47,7 +47,7 @@ const facade: TradefastApiFacade = {
 
 describe('Nest GraphQL resolver', () => {
   it('maps Tradefast status and strategies into GraphQL DTOs', async () => {
-    const resolver = new TradefastResolver(facade);
+    const resolver = new TradefastResolver(new TradefastRepository(facade));
 
     await expect(resolver.strategies()).resolves.toEqual([{ id: 'trend-following', title: 'Trend Following' }]);
     await expect(resolver.status()).resolves.toMatchObject({
@@ -62,7 +62,7 @@ describe('Nest GraphQL resolver', () => {
   });
 
   it('exposes start, update, and clear mutations', async () => {
-    const resolver = new TradefastResolver(facade);
+    const resolver = new TradefastResolver(new TradefastRepository(facade));
 
     await expect(resolver.start()).resolves.toMatchObject({ runId: 2, kind: 'start' });
     await expect(resolver.update()).resolves.toMatchObject({ runId: 3, kind: 'update' });

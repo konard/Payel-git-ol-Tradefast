@@ -66,6 +66,13 @@ interactive terminal UI.
   to hold the directional bet) while every strategy algorithm stays identical.
 - **In-process NestJS GraphQL backend**: the interactive CLI starts a local
   GraphQL endpoint without a second service process.
+- **Repository-mediated GraphQL layer**: the API surface lives entirely in the
+  backend. Both ends of the `cli → graphql → backend` path own a repository — the
+  backend `TradefastRepository` (`src/backend/graphql/`) maps the application
+  facade onto GraphQL DTOs, and the frontend `GraphqlTradefastRepository`
+  (`src/cli/graphql/`) is the only place the CLI talks to the API. Each GraphQL
+  class lives in its own file on both sides. The headless `status`, `strategies`
+  and `clear` commands make their requests through this path.
 - **Dockerised**: `docker compose up` brings up PostgreSQL and the CLI.
 
 ---
